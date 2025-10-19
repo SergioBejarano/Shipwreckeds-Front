@@ -1,0 +1,10 @@
+name: shipwreckeds-frontend
+services:
+  web:
+    build:
+      context: .
+      target: prod
+    image: shipwreckeds-frontend:prod
+    container_name: shipwreckeds-frontend
+    ports:
+      - "8080:80"

@@ -1,0 +1,17 @@
+name: shipwreckeds-frontend-dev
+services:
+  web:
+    build:
+      context: .
+      target: dev
+    image: shipwreckeds-frontend:dev
+    container_name: shipwreckeds-frontend-dev
+    ports:
+      - "5173:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_PORT=5173
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    command: ["pnpm", "dev", "--", "--host", "0.0.0.0", "--strictPort", "--port", "5173"]
