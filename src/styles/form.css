@@ -30,3 +30,41 @@
   color: #64748b;
   font-size: 0.9rem;
 }
+
+/* CreateJoin specific */
+.create-join-container {
+  text-align: center;
+  margin-top: 20px;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.cj-title {
+  margin-bottom: 18px;
+  font-size: 1.5rem;
+  color: #0f172a;
+}
+
+.cj-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.cj-separator {
+  width: 60%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0), rgba(0,0,0,0.08), rgba(255,255,255,0));
+  margin: 20px auto;
+}
+
+.cj-form .input {
+  width: 260px;
+  text-align: center;
+}
+
+.error-message {
+  color: #b91c1c;
+  margin-top: 10px;
+}

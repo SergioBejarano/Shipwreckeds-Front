@@ -42,35 +42,34 @@ const CreateJoin: React.FC<CreateJoinProps> = ({ username, onEnterLobby }) => {
   };
 
   return (
-    <div style={{ textAlign: "center", marginTop: 40 }}>
-      <h2>Bienvenido, {username}</h2>
+    <div className="create-join-container">
+      <h2 className="cj-title">Bienvenido, {username}</h2>
 
-      <div style={{ marginTop: 20 }}>
-        <button onClick={handleCreate} disabled={loadingCreate}>
+      <div className="cj-actions">
+        <button className="button" onClick={handleCreate} disabled={loadingCreate}>
           {loadingCreate ? "Creando..." : "Crear partida"}
         </button>
       </div>
 
-      <hr style={{ width: 300, margin: "20px auto" }} />
+      <div className="cj-separator" />
 
-      <form onSubmit={handleJoin}>
-        <div>
-          <input
-            placeholder="Código de partida"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            style={{ textTransform: "uppercase" }}
-          />
-        </div>
+      <form className="cj-form" onSubmit={handleJoin}>
+        <input
+          className="input"
+          placeholder="Código de partida"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          style={{ textTransform: "uppercase" }}
+        />
 
-        <div style={{ marginTop: 10 }}>
-          <button type="submit" disabled={joining}>
+        <div className="cj-actions" style={{ marginTop: 12 }}>
+          <button className="button" type="submit" disabled={joining}>
             {joining ? "Uniéndote..." : "Unirse a partida"}
           </button>
         </div>
       </form>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <p className="error-message">{error}</p>}
     </div>
   );
 };
