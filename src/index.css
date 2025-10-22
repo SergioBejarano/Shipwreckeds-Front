@@ -1,3 +1,34 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+body, html, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.portada-container {
+  width: 100vw;
+  height: 100vh;
+  background-image: url("./assets/portada.jpg");
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.boton-iniciar {
+  padding: 15px 40px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background-color: #4FC3F7; /* azul agua */
+  color: white;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.boton-iniciar:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(0,0,0,0.3);
+}
