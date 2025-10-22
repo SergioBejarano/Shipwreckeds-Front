@@ -1,23 +1,28 @@
 import React, { useState } from "react";
 import Portada from "./components/Portada";
+import Login from "./components/Login";
 
 function App() {
-  const [logueado, setLogueado] = useState(false);
+  const [pantalla, setPantalla] = useState<"portada" | "login" | "juego">("portada");
+  const [jugador, setJugador] = useState("");
 
-  const handleIniciarSesion = () => {
-    setLogueado(true);
+  const handleIrLogin = () => setPantalla("login");
+
+  const handleLoginSuccess = (username: string) => {
+    setJugador(username);
+    setPantalla("juego");
   };
 
   return (
-    <div>
-      {!logueado ? (
-        <Portada onIniciarSesion={handleIniciarSesion} />
-      ) : (
+    <>
+      {pantalla === "portada" && <Portada onIniciarSesion={handleIrLogin} />}
+      {pantalla === "login" && <Login onLoginSuccess={handleLoginSuccess} />}
+      {pantalla === "juego" && (
         <div style={{ textAlign: "center", marginTop: "40vh", fontSize: "2rem" }}>
-          Bienvenido al juego 🌊
+          Bienvenido al juego, {jugador} 🌴
         </div>
       )}
-    </div>
+    </>
   );
 }
 
