@@ -3,6 +3,11 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css"; // <- imprescindible
 
+import './styles/reset.css';
+import './styles/layout.css';
+import './styles/form.css';
+import './styles/lobby.css';
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <App />

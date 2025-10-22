@@ -1,0 +1,46 @@
+/* src/styles/layout.css */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  align-items: center;
+  padding: 2rem;
+}
+
+.card {
+  width: 100%;
+  max-width: 880px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(15,23,42,0.06);
+  padding: 24px;
+  margin-bottom: 18px;
+}
+
+.header {
+  width: 100%;
+  max-width: 880px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.brand .logo {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg,#06b6d4,#7c3aed);
+  border-radius: 8px;
+}
+
+.title {
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #0f172a;
+}

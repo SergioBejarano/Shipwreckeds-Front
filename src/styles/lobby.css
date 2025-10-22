@@ -1,0 +1,49 @@
+/* src/styles/lobby.css */
+.lobby {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 18px;
+  width: 100%;
+  max-width: 950px;
+}
+
+.lobby-main {
+  padding: 12px;
+  min-height: 220px;
+}
+
+.lobby-aside {
+  padding: 12px;
+  border-left: 1px dashed #eef2ff;
+}
+
+.players-list, .npc-list {
+  list-style: none;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.player {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: linear-gradient(90deg,#f8fafc,#ffffff);
+  border: 1px solid #eef2ff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.player .name {
+  font-weight: 600;
+}
+
+.status-badge {
+  background: #eef2ff;
+  color: #0f172a;
+  padding: 6px 8px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  border: 1px solid #e6eef8;
+}
