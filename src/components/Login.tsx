@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { login } from "../utils/api";
 
 interface LoginProps {
   onLoginSuccess: (username: string) => void;
@@ -8,8 +9,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!username || !password) {
@@ -17,8 +19,19 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    setError("");
-    onLoginSuccess(username);
+    try {
+      setLoading(true);
+      setError("");
+
+      const player = await login({ username, password });
+      console.log("Inicio de sesión exitoso:", player);
+
+      onLoginSuccess(player.username);
+    } catch (err: any) {
+      setError(err.message || "Error inesperado al iniciar sesión");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -42,7 +55,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
         {error && <p className="error-message">{error}</p>}
 
-        <button type="submit">Entrar</button>
+        <button type="submit" disabled={loading}>
+          {loading ? "Conectando..." : "Entrar"}
+        </button>
       </form>
     </div>
   );
