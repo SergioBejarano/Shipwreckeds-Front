@@ -49,6 +49,14 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   // movement state
   const keysRef = useRef<Record<string, boolean>>({});
   const sendIntervalRef = useRef<number | null>(null);
+  
+
+  // ----- moved INSIDE the component to avoid invalid hook call -----
+  const myAvatarIdRef = useRef<number | null>(null);
+  // map local (por sesión) de id de NPC -> alias visible para este cliente
+  const npcNameMapRef = useRef<Record<number, string>>({});
+
+  // ----------------------------------------------------------------
 
   // init STOMP client & subscribe to /topic/game/{matchCode}
   useEffect(() => {
@@ -118,13 +126,32 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
           if (Array.isArray(m.players)) {
             for (const p of m.players) {
               const pos = p.position || { x: 0, y: 0 };
-              avatars.push({ id: p.id, type: "human", ownerUsername: p.username, x: pos.x, y: pos.y, isInfiltrator: !!p.isInfiltrator, isAlive: p.isAlive });
+              avatars.push({
+                id: p.id,
+                type: "human",
+                ownerUsername: p.username,
+                x: pos.x,
+                y: pos.y,
+                isInfiltrator: !!p.isInfiltrator,
+                isAlive: p.isAlive,
+              });
+              if (p.username === currentUser) {
+                myAvatarIdRef.current = p.id; // <-- guarda mi id aquí
+              }
             }
           }
           if (Array.isArray(m.npcs)) {
             for (const n of m.npcs) {
               const pos = n.position || { x: 0, y: 0 };
-              avatars.push({ id: n.id, type: "npc", ownerUsername: null, x: pos.x, y: pos.y, isInfiltrator: !!n.infiltrator, isAlive: n.active !== false });
+              avatars.push({
+                id: n.id,
+                type: "npc",
+                ownerUsername: null,
+                x: pos.x,
+                y: pos.y,
+                isInfiltrator: !!n.infiltrator,
+                isAlive: n.active !== false,
+              });
             }
           }
           setGameState({ code: matchCode, timestamp: Date.now(), island, avatars });
@@ -135,7 +162,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
     }
     fetchInitial();
     return () => { mounted = false; };
-  }, [matchCode]);
+  }, [matchCode, currentUser]);
 
   // preload barco image
   useEffect(() => {
@@ -144,10 +171,29 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
     barcoImgRef.current = img;
   }, []);
 
-  // helper: get my avatar id
+    // asigna alias aleatorios a NPCs que aún no tengan uno (por sesión)
+  useEffect(() => {
+    if (!gameState) return;
+    const map = npcNameMapRef.current;
+    for (const a of gameState.avatars) {
+      if (a.type === "npc" && !map[a.id]) {
+        const rand = Math.floor(Math.random() * 9000) + 1000; // 4 dígitos
+        map[a.id] = `NPC-${rand}`;
+      }
+    }
+  }, [gameState]);
+
+
   const getMyAvatar = useCallback((): Avatar | undefined => {
     if (!gameState) return undefined;
-    return gameState.avatars.find((a) => a.type === "human" && a.ownerUsername === currentUser);
+    // preferir búsqueda por ownerUsername si existe
+    const byOwner = gameState.avatars.find((a) => a.ownerUsername === currentUser && a.type === "human");
+    if (byOwner) return byOwner;
+    // fallback: usar el id guardado en fetchInitial
+    if (myAvatarIdRef.current != null) {
+      return gameState.avatars.find((a) => a.id === myAvatarIdRef.current) as Avatar | undefined;
+    }
+    return undefined;
   }, [gameState, currentUser]);
 
   // send move command to server
@@ -273,49 +319,49 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
     }
 
     function draw() {
-  // clear (use actual pixel buffer size)
-  ctxEl.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      // clear (use actual pixel buffer size)
+      ctxEl.clearRect(0, 0, canvasEl.width, canvasEl.height);
 
-  // draw sea background
-  ctxEl.fillStyle = "#9ad0ff"; // light blue
-  ctxEl.fillRect(0, 0, canvasEl.width, canvasEl.height);
+      // draw sea background
+      ctxEl.fillStyle = "#9ad0ff"; // light blue
+      ctxEl.fillRect(0, 0, canvasEl.width, canvasEl.height);
 
       // if no gameState, text
       if (!gameState) {
-  ctxEl.fillStyle = "#023e8a";
-  ctxEl.font = "18px Inter, sans-serif";
-  ctxEl.fillText("Esperando estado del juego...", 20, 40);
+        ctxEl.fillStyle = "#023e8a";
+        ctxEl.font = "18px Inter, sans-serif";
+        ctxEl.fillText("Esperando estado del juego...", 20, 40);
         rafId = requestAnimationFrame(draw);
         return;
       }
 
-  // island
-  const island = gameState.island || { cx: 0, cy: 0, radius: 100 };
-  const { islandPixelRadius, centerX, centerY } = worldToPixel(island.cx, island.cy);
+      // island
+      const island = gameState.island || { cx: 0, cy: 0, radius: 100 };
+      const { islandPixelRadius, centerX, centerY } = worldToPixel(island.cx, island.cy);
       // gradient: center green, edge sand
-  const grad = ctxEl.createRadialGradient(centerX, centerY, islandPixelRadius * 0.1, centerX, centerY, islandPixelRadius);
-  grad.addColorStop(0, "#7BD389"); // green
-  grad.addColorStop(0.7, "#E8D8A8"); // sand
-  ctxEl.beginPath();
-  ctxEl.fillStyle = grad;
-  ctxEl.arc(centerX, centerY, islandPixelRadius, 0, Math.PI * 2);
-  ctxEl.fill();
-  ctxEl.closePath();
+      const grad = ctxEl.createRadialGradient(centerX, centerY, islandPixelRadius * 0.1, centerX, centerY, islandPixelRadius);
+      grad.addColorStop(0, "#7BD389"); // green
+      grad.addColorStop(0.7, "#E8D8A8"); // sand
+      ctxEl.beginPath();
+      ctxEl.fillStyle = grad;
+      ctxEl.arc(centerX, centerY, islandPixelRadius, 0, Math.PI * 2);
+      ctxEl.fill();
+      ctxEl.closePath();
 
       // boat: draw image to the right of island
       const boatImg = barcoImgRef.current;
       if (boatImg && boatImg.complete) {
         const boatW = islandPixelRadius * 0.5;
         const boatH = islandPixelRadius * 0.25;
-  ctxEl.drawImage(boatImg, centerX + islandPixelRadius + 6, centerY - boatH / 2, boatW, boatH);
+        ctxEl.drawImage(boatImg, centerX + islandPixelRadius + 6, centerY - boatH / 2, boatW, boatH);
       } else {
         // fallback rectangle
         const boatW = islandPixelRadius * 0.5;
         const boatH = islandPixelRadius * 0.25;
-  ctxEl.fillStyle = "#6b3e26";
-  ctxEl.fillRect(centerX + islandPixelRadius + 6, centerY - boatH / 2, boatW, boatH);
-  ctxEl.strokeStyle = "#3b2b1f";
-  ctxEl.strokeRect(centerX + islandPixelRadius + 6, centerY - boatH / 2, boatW, boatH);
+        ctxEl.fillStyle = "#6b3e26";
+        ctxEl.fillRect(centerX + islandPixelRadius + 6, centerY - boatH / 2, boatW, boatH);
+        ctxEl.strokeStyle = "#3b2b1f";
+        ctxEl.strokeRect(centerX + islandPixelRadius + 6, centerY - boatH / 2, boatW, boatH);
       }
 
       // draw avatars
@@ -327,31 +373,37 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
         // shadow
         ctxEl.beginPath();
         ctxEl.fillStyle = "rgba(0,0,0,0.12)";
-  ctxEl.ellipse(px + 3, py + 6, 10, 5, 0, 0, Math.PI * 2);
+        ctxEl.ellipse(px + 3, py + 6, 10, 5, 0, 0, Math.PI * 2);
         ctxEl.fill();
         ctxEl.closePath();
 
         // avatar circle
-  ctxEl.beginPath();
-  ctxEl.fillStyle = fill;
-  ctxEl.strokeStyle = a.isInfiltrator ? "#ffcc00" : "#ffffff";
-  ctxEl.lineWidth = a.isInfiltrator ? 3 : 2;
-  ctxEl.arc(px, py, 12, 0, Math.PI * 2);
-  ctxEl.fill();
-  ctxEl.stroke();
-  ctxEl.closePath();
+        ctxEl.beginPath();
+        ctxEl.fillStyle = fill;
+        ctxEl.strokeStyle = a.isInfiltrator ? "#ffcc00" : "#ffffff";
+        ctxEl.lineWidth = a.isInfiltrator ? 3 : 2;
+        ctxEl.arc(px, py, 12, 0, Math.PI * 2);
+        ctxEl.fill();
+        ctxEl.stroke();
+        ctxEl.closePath();
 
         // name
-  ctxEl.fillStyle = "#062a44";
-  ctxEl.font = "12px Inter, sans-serif";
-  ctxEl.fillText(a.ownerUsername ? a.ownerUsername : (a.type === "npc" ? `NPC ${a.id}` : `P${a.id}`), px + 16, py + 4);
+        ctxEl.fillStyle = "#062a44";
+        ctxEl.font = "12px Inter, sans-serif";
+        const displayName = a.ownerUsername
+          ? a.ownerUsername
+          : (a.type === "npc"
+            ? (npcNameMapRef.current[a.id] || `NPC-${a.id}`)
+            : `P${a.id}`);
+          ctxEl.fillText(displayName, px + 16, py + 4);
+
       }
 
-  // HUD: connection & instructions
-  ctxEl.fillStyle = "#043454";
-  ctxEl.font = "13px Inter, sans-serif";
-  ctxEl.fillText(`Partida: ${gameState.code} — Usuario: ${currentUser}`, 12, canvasEl.height - 28);
-  ctxEl.fillText(connected ? "Conectado" : "Desconectado", 12, canvasEl.height - 10);
+      // HUD: connection & instructions
+      ctxEl.fillStyle = "#043454";
+      ctxEl.font = "13px Inter, sans-serif";
+      ctxEl.fillText(`Partida: ${gameState.code} — Usuario: ${currentUser}`, 12, canvasEl.height - 28);
+      ctxEl.fillText(connected ? "Conectado" : "Desconectado", 12, canvasEl.height - 10);
 
       rafId = requestAnimationFrame(draw);
     }
