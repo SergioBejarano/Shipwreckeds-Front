@@ -8,9 +8,10 @@ interface LobbyProps {
   code: string;
   currentUser: string;
   isHost: boolean;
+  onStartGame?: (match: Match) => void;
 }
 
-const Lobby: React.FC<LobbyProps> = ({ code, currentUser, isHost }) => {
+const Lobby: React.FC<LobbyProps> = ({ code, currentUser, isHost, onStartGame }) => {
   const [match, setMatch] = useState<Match | null>(null);
   const [starting, setStarting] = useState(false);
 
@@ -26,6 +27,13 @@ const Lobby: React.FC<LobbyProps> = ({ code, currentUser, isHost }) => {
     () => console.log("Conectado al lobby", code),
     () => console.log("Desconectado del lobby", code)
   );
+
+  // notify parent when match goes to STARTED
+  useEffect(() => {
+    if (match && match.status === "STARTED") {
+      onStartGame && onStartGame(match);
+    }
+  }, [match, onStartGame]);
 
   const handleStart = async () => {
     if (!match) return;
