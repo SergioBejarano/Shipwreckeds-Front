@@ -25,6 +25,7 @@ type Island = {
 type GameState = {
   code: string;
   timestamp?: number;
+  timerSeconds?: number;
   avatars: Avatar[];
   island: Island;
   boat?: { x: number; y: number };
@@ -397,6 +398,41 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
             : `P${a.id}`);
           ctxEl.fillText(displayName, px + 16, py + 4);
 
+      }
+
+      // draw timer (top-right) if provided
+      if (typeof gameState.timerSeconds === 'number') {
+        const ts = Math.max(0, Math.floor(gameState.timerSeconds));
+        const mins = Math.floor(ts / 60).toString().padStart(2, '0');
+        const secs = (ts % 60).toString().padStart(2, '0');
+        const label = `${mins}:${secs}`;
+        const padding = 8;
+        ctxEl.font = "16px Inter, sans-serif";
+        const textWidth = ctxEl.measureText(label).width;
+        const boxW = textWidth + padding * 2;
+        const boxH = 26;
+        const boxX = canvasEl.width / (window.devicePixelRatio || 1) - boxW - 12;
+        const boxY = 12;
+        // background
+        ctxEl.fillStyle = "rgba(0,0,0,0.55)";
+        roundRect(ctxEl, boxX, boxY, boxW, boxH, 6, true, false);
+        // text
+        ctxEl.fillStyle = "#fff";
+        ctxEl.fillText(label, boxX + padding, boxY + boxH - 8);
+      }
+
+      // helper for rounded rect
+      function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, fill?: boolean, stroke?: boolean) {
+        if (typeof r === 'undefined') r = 5;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+        if (fill) ctx.fill();
+        if (stroke) ctx.stroke();
       }
 
       // HUD: connection & instructions
