@@ -1,4 +1,5 @@
 // src/components/GameCanvas.tsx
+import React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Client } from "@stomp/stompjs";
 import type { IMessage } from "@stomp/stompjs";
@@ -14,6 +15,7 @@ type Avatar = {
   y: number;
   isInfiltrator?: boolean;
   isAlive?: boolean;
+  displayName?: string | null;
 };
 
 type Island = {
@@ -31,6 +33,9 @@ type GameState = {
   boat?: { x: number; y: number };
 };
 
+type VoteStartPayload = { options: Avatar[]; message?: string };
+type VoteResultPayload = { counts: Record<number, number>; expelledId?: number | null; expelledType?: string; message?: string };
+
 type Props = {
   matchCode: string;
   currentUser: string;
@@ -39,6 +44,7 @@ type Props = {
 };
 
 const WS_URL = "http://localhost:8080/ws"; // apunta a tu backend
+const BACKEND_BASE = WS_URL.replace(/\/ws$/, '');
 
 export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, canvasHeight = 600 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -46,6 +52,11 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const clientRef = useRef<Client | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [connected, setConnected] = useState(false);
+  // voting UI state
+  const [voteModalOpen, setVoteModalOpen] = useState(false);
+  const [voteOptions, setVoteOptions] = useState<Avatar[]>([]);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [voteResult, setVoteResult] = useState<VoteResultPayload | null>(null);
 
   // movement state
   const keysRef = useRef<Record<string, boolean>>({});
@@ -56,6 +67,8 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const myAvatarIdRef = useRef<number | null>(null);
   // map local (por sesión) de id de NPC -> alias visible para este cliente
   const npcNameMapRef = useRef<Record<number, string>>({});
+  // flag local para saber si el cliente actual es el infiltrado
+  const isInfiltratorRef = useRef<boolean>(false);
 
   // ----------------------------------------------------------------
 
@@ -84,14 +97,53 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
             client.subscribe(`/topic/game/${matchCode}`, (msg: IMessage) => {
               try {
                 const payload = JSON.parse(msg.body) as GameState;
-                setGameState(payload);
+                    setGameState(payload);
+                    // update local infiltrator flag: try to find our avatar by ownerUsername or known id
+                    try {
+                      const myByOwner = payload.avatars.find(a => a.ownerUsername === currentUser && a.type === 'human');
+                      const myById = myAvatarIdRef.current != null ? payload.avatars.find(a => a.id === myAvatarIdRef.current) : undefined;
+                      const myAvatar = myByOwner || myById;
+                      isInfiltratorRef.current = !!(myAvatar && myAvatar.isInfiltrator);
+                    } catch (e) {
+                      // ignore
+                    }
               } catch (e) {
                 console.warn("Invalid game message", e);
               }
             });
+
+            // voting: start and result
+            client.subscribe(`/topic/game/${matchCode}/vote/start`, (msg: IMessage) => {
+              try {
+                const payload = JSON.parse(msg.body) as VoteStartPayload;
+                setVoteOptions(payload.options || []);
+                setHasVoted(false);
+                // only open modal for non-infiltrators (infiltrados no participan)
+                if (isInfiltratorRef.current) {
+                  // ensure we do not open voting UI for infiltrator
+                  return;
+                }
+                setVoteModalOpen(true);
+              } catch (e) {
+                console.warn('Invalid vote start', e);
+              }
+            });
+
+            client.subscribe(`/topic/game/${matchCode}/vote/result`, (msg: IMessage) => {
+              try {
+                const payload = JSON.parse(msg.body) as VoteResultPayload;
+                // set result state so UI can render counts and expelled info
+                setVoteResult(payload);
+                // close vote selection modal
+                setVoteModalOpen(false);
+                // if human expelled, we'll show result then redirect in UI after a short delay
+              } catch (e) {
+                console.warn('Invalid vote result', e);
+              }
+            });
           },
-          onStompError: (frame) => {
-            console.error("STOMP error", frame);
+          onStompError: (frame: any) => {
+            console.error('STOMP error', frame);
           },
           onDisconnect: () => setConnected(false),
         });
@@ -127,15 +179,28 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
           if (Array.isArray(m.players)) {
             for (const p of m.players) {
               const pos = p.position || { x: 0, y: 0 };
-              avatars.push({
-                id: p.id,
-                type: "human",
-                ownerUsername: p.username,
-                x: pos.x,
-                y: pos.y,
-                isInfiltrator: !!p.isInfiltrator,
-                isAlive: p.isAlive,
-              });
+                if (p.isInfiltrator) {
+                  // do not reveal infiltrator username in initial fetch; represent as npc
+                  avatars.push({
+                    id: p.id,
+                    type: "npc",
+                    ownerUsername: null,
+                    x: pos.x,
+                    y: pos.y,
+                    isInfiltrator: true,
+                    isAlive: p.isAlive,
+                  });
+                } else {
+                  avatars.push({
+                    id: p.id,
+                    type: "human",
+                    ownerUsername: p.username,
+                    x: pos.x,
+                    y: pos.y,
+                    isInfiltrator: !!p.isInfiltrator,
+                    isAlive: p.isAlive,
+                  });
+                }
               if (p.username === currentUser) {
                 myAvatarIdRef.current = p.id; // <-- guarda mi id aquí
               }
@@ -184,15 +249,21 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
     }
   }, [gameState]);
 
+    const getDisplayName = useCallback((a: Avatar) => {
+      if (a.displayName) return a.displayName;
+      if (a.ownerUsername) return a.ownerUsername;
+      return npcNameMapRef.current[a.id] || `NPC-${a.id}`;
+    }, []);
+
 
   const getMyAvatar = useCallback((): Avatar | undefined => {
     if (!gameState) return undefined;
     // preferir búsqueda por ownerUsername si existe
-    const byOwner = gameState.avatars.find((a) => a.ownerUsername === currentUser && a.type === "human");
+    const byOwner = gameState.avatars.find((a: Avatar) => a.ownerUsername === currentUser && a.type === "human");
     if (byOwner) return byOwner;
     // fallback: usar el id guardado en fetchInitial
     if (myAvatarIdRef.current != null) {
-      return gameState.avatars.find((a) => a.id === myAvatarIdRef.current) as Avatar | undefined;
+      return gameState.avatars.find((a: Avatar) => a.id === myAvatarIdRef.current) as Avatar | undefined;
     }
     return undefined;
   }, [gameState, currentUser]);
@@ -388,15 +459,11 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
         ctxEl.stroke();
         ctxEl.closePath();
 
-        // name
+        // name (use canonical helper so canvas and vote UI match)
         ctxEl.fillStyle = "#062a44";
         ctxEl.font = "12px Inter, sans-serif";
-        const displayName = a.ownerUsername
-          ? a.ownerUsername
-          : (a.type === "npc"
-            ? (npcNameMapRef.current[a.id] || `NPC-${a.id}`)
-            : `P${a.id}`);
-          ctxEl.fillText(displayName, px + 16, py + 4);
+        const displayName = getDisplayName(a);
+        ctxEl.fillText(displayName, px + 16, py + 4);
 
       }
 
@@ -520,6 +587,114 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
       </div>
 
       <canvas ref={canvasRef} />
+
+      {/* Vote button bottom-left */}
+      {(() => {
+        const isInfiltrator = !!isInfiltratorRef.current;
+        return (
+          <button
+            className="vote-button"
+            disabled={isInfiltrator}
+            title={isInfiltrator ? 'El infiltrado no puede iniciar votaciones' : 'Iniciar votación'}
+            onClick={async () => {
+              if (isInfiltratorRef.current) return; // extra guard
+              try {
+                const res = await fetch(`${BACKEND_BASE}/api/match/${matchCode}/startVote?username=${encodeURIComponent(currentUser)}`, { method: 'POST' });
+                if (!res.ok) {
+                  const text = await res.text();
+                  alert('No se pudo iniciar la votación: ' + text);
+                }
+              } catch (e) {
+                console.error(e);
+                alert('Error iniciando votación');
+              }
+            }}
+          >
+            Iniciar votación
+          </button>
+        );
+      })()}
+
+      {/* Voting modal */}
+      {voteModalOpen && (
+        <div className="vote-modal">
+          <div className="vote-modal-card">
+            <h3>Elige un NPC para expulsar</h3>
+            <div className="vote-options">
+              {voteOptions.map((o: Avatar) => {
+                const displayName = getDisplayName(o);
+                return (
+                <div key={o.id} className="vote-option">
+                  <div>{displayName} — {o.type}</div>
+                  <button
+                    disabled={hasVoted}
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`${BACKEND_BASE}/api/match/${matchCode}/vote`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ username: currentUser, targetId: o.id }),
+                        });
+                        if (res.ok) {
+                          setHasVoted(true);
+                          alert('Voto registrado correctamente, esperando resultados finales.');
+                        } else {
+                          const txt = await res.text();
+                          alert('Fallo al votar: ' + txt);
+                        }
+                      } catch (e) {
+                        console.error(e);
+                        alert('Error al enviar voto');
+                      }
+                    }}
+                  >Votar</button>
+                </div>
+                  );
+                })}
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <button onClick={() => setVoteModalOpen(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Vote result modal showing counts */}
+      {voteResult && (
+        <div className="vote-modal">
+          <div className="vote-modal-card">
+            <h3>Resultados de la votación</h3>
+            <div style={{ marginTop: 8 }}>
+              {Object.keys(voteResult.counts).map((k) => {
+                const id = Number(k);
+                const count = voteResult.counts[id];
+                // find avatar to display name (prefer server-provided displayName)
+                const av = gameState?.avatars.find(a => a.id === id);
+                const name = av ? (av.displayName || av.ownerUsername || npcNameMapRef.current[id] || `NPC-${id}`) : (npcNameMapRef.current[id] || `NPC-${id}`);
+                return (
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: '#f7f9fb', borderRadius: 6, marginBottom: 6 }}>
+                    <div>{name}</div>
+                    <div><strong>{count}</strong></div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <div>{voteResult.message}</div>
+              <div style={{ marginTop: 12 }}>
+                <button onClick={() => {
+                  // if human expelled, redirect; otherwise just close
+                  if (voteResult.expelledType === 'human') {
+                    window.location.href = '/';
+                  } else {
+                    setVoteResult(null);
+                  }
+                }}>Cerrar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ marginTop: 8 }}>
         <small className="small-muted">
