@@ -92,3 +92,72 @@
 .vote-option { display:flex; justify-content: space-between; align-items: center; padding: 8px; border-radius: 8px; background: #f7f9fb; }
 .vote-option button { background:#06b6d4; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
 .vote-option button:disabled { opacity:0.6; cursor:not-allowed; }
+
+/* Elimination overlay button (rendered above canvas) */
+.kill-button {
+  background:#ef4444;
+  color:#fff;
+  border:none;
+  padding:4px 8px;
+  border-radius:6px;
+  font-size:12px;
+  box-shadow: 0 4px 12px rgba(2,6,23,0.2);
+  cursor:pointer;
+  z-index: 1100;
+}
+
+.fuel-panel {
+  width: 100%;
+  background: rgba(255,255,255,0.9);
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 10px 30px rgba(2,6,23,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fuel-progress {
+  width: 100%;
+  height: 14px;
+  background: rgba(6, 182, 212, 0.15);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.fuel-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0ea5e9 0%, #10b981 100%);
+  width: 0%;
+  transition: width 0.25s ease;
+}
+
+.fuel-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #043454;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.fuel-action-button {
+  background: #0ea5e9;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.35);
+  cursor: pointer;
+}
+
+.fuel-action-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.fuel-action-button.sabotage {
+  background: #ef4444;
+  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35);
+}

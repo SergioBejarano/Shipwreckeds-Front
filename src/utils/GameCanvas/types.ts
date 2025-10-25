@@ -16,13 +16,21 @@ export type Island = {
   radius: number;
 };
 
+export type Boat = {
+  x: number;
+  y: number;
+  interactionRadius?: number;
+};
+
 export type GameState = {
   code: string;
   timestamp?: number;
   timerSeconds?: number;
   avatars: Avatar[];
   island: Island;
-  boat?: { x: number; y: number };
+  boat?: Boat;
+  fuelPercentage?: number;
+  status?: string;
 };
 
 export type Props = {

@@ -33,13 +33,18 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const [voteOptions, setVoteOptions] = useState<Avatar[]>([]);
   const [hasVoted, setHasVoted] = useState(false);
   const [voteResult, setVoteResult] = useState<VoteResultPayload | null>(null);
-
   const myAvatarIdRef = useRef<number | null>(null);
   const npcNameMapRef = useRef<Record<number, string>>({});
   const isInfiltratorRef = useRef<boolean>(false);
+  const completionShownRef = useRef<boolean>(false);
+  const [fuelActionPending, setFuelActionPending] = useState(false);
+
+  const fuelPercentage = Math.max(0, Math.min(100, gameState?.fuelPercentage ?? 0));
+  const gameStatus = (gameState?.status ?? '').toUpperCase();
+  const isGameFinished = gameStatus === 'FINISHED';
 
   // STOMP client + subscriptions (moved to hook)
-  useStompClient(matchCode, clientRef, setGameState, setConnected, setVoteOptions, setVoteModalOpen, setVoteResult);
+  useStompClient(matchCode, clientRef as any, setGameState, setConnected, setVoteOptions, setVoteModalOpen, setVoteResult);
 
   // preload barco image
   useBarcoImage(barcoImgRef);
@@ -106,25 +111,160 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
     if (myAvatarIdRef.current != null) return gameState.avatars.find((a: Avatar) => a.id === myAvatarIdRef.current);
     return undefined;
   }, [gameState, currentUser]);
-
   // movement hook: handles keyboard sending and provides click/mouse handlers
   const { handleCanvasClick, handleMouseMove, cursorRef } = useMovement({ clientRef, matchCode, currentUser, getMyAvatar, gameState });
+
+  // canvas drawing loop (hook)
+  useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, canvasWidth, canvasHeight, connected, getDisplayName, npcNameMapRef });
+
+  // keep local infiltrator flag up-to-date when we get GameState
+  useEffect(() => {
+    if (!gameState) { isInfiltratorRef.current = false; return; }
+    const me = gameState.avatars.find((a: Avatar) => a.ownerUsername === currentUser && a.type === 'human')
+      || (myAvatarIdRef.current != null ? gameState.avatars.find((a: Avatar) => a.id === myAvatarIdRef.current) : undefined);
+    isInfiltratorRef.current = !!(me && me.isInfiltrator);
+  }, [gameState, currentUser]);
+
+  useEffect(() => {
+    if (!gameState) { completionShownRef.current = false; return; }
+    const status = (gameState.status ?? '').toUpperCase();
+    const fuel = gameState.fuelPercentage ?? 0;
+    if (status === 'FINISHED' && fuel >= 100) {
+      if (!completionShownRef.current) {
+        completionShownRef.current = true;
+        alert('Partida terminada, ganaron los naufragos.');
+      }
+    } else if (status !== 'FINISHED') {
+      completionShownRef.current = false;
+    }
+  }, [gameState]);
+
+  // show victim alert if our own avatar transitions from alive -> dead
+  const myAliveRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!gameState) return;
+    const me = gameState.avatars.find((a: Avatar) => a.ownerUsername === currentUser && a.type === 'human')
+      || (myAvatarIdRef.current != null ? gameState.avatars.find((a: Avatar) => a.id === myAvatarIdRef.current) : undefined);
+    if (!me) return;
+    const nowAlive = me.isAlive !== false;
+    const prev = myAliveRef.current;
+    if (prev === null) {
+      myAliveRef.current = nowAlive;
+      return;
+    }
+    if (prev && !nowAlive) {
+      alert('Has sido eliminado.');
+    }
+    myAliveRef.current = nowAlive;
+  }, [gameState, currentUser]);
+
+  const attemptElimination = useCallback(async (targetId: number) => {
+    try {
+      const res = await fetch(`${BACKEND_BASE}/api/match/${matchCode}/eliminate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser, targetId })
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        alert('No se pudo eliminar: ' + txt);
+      }
+    } catch (e) {
+      // ignore network errors for now
+    }
+  }, [matchCode, currentUser]);
+
+  const handleEliminationClick = useCallback((event: MouseEvent) => {
+    const canvas = canvasRef.current;
+    if (canvas && isInfiltratorRef.current && gameState) {
+      const rect = canvas.getBoundingClientRect();
+      const island = gameState.island || { cx: 0, cy: 0, radius: 100 };
+      const width = rect.width;
+      const height = rect.height;
+      const pixelIslandRadius = Math.min(width, height) * 0.36;
+      const scale = island.radius > 0 ? pixelIslandRadius / island.radius : pixelIslandRadius / 100;
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const clickX = event.offsetX;
+      const clickY = event.offsetY;
+      const target = gameState.avatars.find((avatar: Avatar) => {
+        if (avatar.type !== 'human') return false;
+        if (avatar.isAlive === false) return false;
+        if (avatar.ownerUsername === currentUser) return false;
+        const avatarPx = centerX + avatar.x * scale;
+        const avatarPy = centerY - avatar.y * scale;
+        const pixelDist = Math.hypot(avatarPx - clickX, avatarPy - clickY);
+        return pixelDist <= 32;
+      });
+      if (target) {
+        event.preventDefault();
+        event.stopPropagation();
+        const me = getMyAvatar();
+        if (me) {
+          const distWorld = Math.hypot(me.x - target.x, me.y - target.y);
+          if (distWorld > 20) {
+            alert('Debes acercarte más para eliminar.');
+            return;
+          }
+        }
+        attemptElimination(target.id);
+        return;
+      }
+    }
+    handleCanvasClick(event);
+  }, [attemptElimination, currentUser, gameState, handleCanvasClick, getMyAvatar]);
+
+  const handleFuelAction = useCallback(async (action: 'FILL' | 'SABOTAGE') => {
+    if (!gameState || isGameFinished) return;
+    const mine = getMyAvatar();
+    const boat = gameState.boat;
+    if (!mine || !boat) {
+      alert('No es posible interactuar con el barco en este momento.');
+      return;
+    }
+    const dist = Math.hypot(mine.x - boat.x, mine.y - boat.y);
+    const radius = boat.interactionRadius ?? 25;
+    if (dist > radius) {
+      alert('Debes acercarte al barco.');
+      return;
+    }
+    setFuelActionPending(true);
+    try {
+      const res = await fetch(`${BACKEND_BASE}/api/match/${matchCode}/fuel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser, action })
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        alert('No se pudo actualizar el combustible: ' + txt);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error al interactuar con el combustible.');
+    } finally {
+      setFuelActionPending(false);
+    }
+  }, [currentUser, gameState, getMyAvatar, isGameFinished, matchCode]);
+
+  const myAvatar = getMyAvatar();
+  const boatInfo = gameState?.boat;
+  const interactionRadius = boatInfo?.interactionRadius ?? 25;
+  const isNearBoat = !!(myAvatar && boatInfo && Math.hypot(myAvatar.x - boatInfo.x, myAvatar.y - boatInfo.y) <= interactionRadius);
+  const isInfiltrator = !!(myAvatar && myAvatar.isInfiltrator);
 
   // attach click/mouse handlers to canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.addEventListener('click', handleCanvasClick as any);
+    canvas.addEventListener('click', handleEliminationClick as any);
     canvas.addEventListener('mousemove', handleMouseMove as any);
     canvas.addEventListener('mouseleave', () => { if (cursorRef) cursorRef.current = null; });
     return () => {
-      canvas.removeEventListener('click', handleCanvasClick as any);
+      canvas.removeEventListener('click', handleEliminationClick as any);
       canvas.removeEventListener('mousemove', handleMouseMove as any);
     };
-  }, [handleCanvasClick, handleMouseMove, cursorRef]);
-
-  // canvas drawing loop (hook)
-  useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, canvasWidth, canvasHeight, connected, getDisplayName, npcNameMapRef });
+  }, [handleEliminationClick, handleMouseMove, cursorRef]);
 
   // vote action passed to VoteModal
   const onVote = async (targetId: number) => {
@@ -161,11 +301,30 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
         <div className="small-muted">{connected ? "Conectado al servidor" : "Conectando..."}</div>
       </div>
 
+      <div className="fuel-panel">
+        <div className="fuel-progress">
+          <div className="fuel-progress__fill" style={{ width: `${fuelPercentage}%` }} />
+        </div>
+        <div className="fuel-meta">
+          <span>
+            Combustible del barco: {fuelPercentage.toFixed(0)}%
+            {isGameFinished ? ' — Partida finalizada' : ''}
+          </span>
+          {isNearBoat && !isGameFinished && (
+            <button
+              className={`fuel-action-button${isInfiltrator ? ' sabotage' : ''}`}
+              onClick={() => handleFuelAction(isInfiltrator ? 'SABOTAGE' : 'FILL')}
+            >
+              {fuelActionPending ? 'Procesando...' : (isInfiltrator ? 'Sabotear' : 'Llenar tanque')}
+            </button>
+          )}
+        </div>
+      </div>
+
       <canvas ref={canvasRef} />
 
       {/* Vote button bottom-left */}
       {(() => {
-        const isInfiltrator = !!isInfiltratorRef.current;
         return (
           <button
             className="vote-button"
@@ -213,7 +372,8 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
 
       <div style={{ marginTop: 8 }}>
         <small className="small-muted">
-          Controles: WASD / Flechas para moverte; click en el mapa para moverte en esa dirección.
+          Controles: WASD / Flechas para moverte; click en el mapa para moverte en esa dirección. Acércate al barco
+          para llenar o sabotear el tanque.
         </small>
       </div>
     </div>

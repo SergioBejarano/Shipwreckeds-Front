@@ -71,8 +71,8 @@ export function useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, ca
         return;
       }
 
-      const island = gameState.island || { cx: 0, cy: 0, radius: 100 };
-      const { islandPixelRadius, centerX, centerY } = worldToPixel(island.cx, island.cy);
+    const island = gameState.island || { cx: 0, cy: 0, radius: 100 };
+    const { islandPixelRadius, centerX, centerY, scale } = worldToPixel(island.cx, island.cy);
 
   const grad = ctxEl.createRadialGradient(centerX, centerY, islandPixelRadius * 0.1, centerX, centerY, islandPixelRadius);
   grad.addColorStop(0, '#7BD389');
@@ -85,21 +85,38 @@ export function useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, ca
 
       // boat
       const boatImg = barcoImgRef.current;
+      const boatInfo = gameState.boat;
+      const boatMetrics = boatInfo ? worldToPixel(boatInfo.x, boatInfo.y) : null;
+      const boatPx = boatMetrics ? boatMetrics.px : centerX + islandPixelRadius + 6 + (islandPixelRadius * 0.25);
+      const boatPy = boatMetrics ? boatMetrics.py : centerY;
+      const boatScale = boatMetrics ? boatMetrics.scale : scale;
+      const boatW = islandPixelRadius * 0.5;
+      const boatH = islandPixelRadius * 0.25;
+      const drawX = boatPx - boatW / 2;
+      const drawY = boatPy - boatH / 2;
+      if (boatInfo && boatInfo.interactionRadius) {
+        const interactionPx = boatInfo.interactionRadius * boatScale;
+        ctxEl.save();
+        ctxEl.strokeStyle = 'rgba(6, 182, 212, 0.25)';
+        ctxEl.setLineDash([8, 10]);
+        ctxEl.lineWidth = 2;
+        ctxEl.beginPath();
+        ctxEl.arc(boatPx, boatPy, interactionPx, 0, Math.PI * 2);
+        ctxEl.stroke();
+        ctxEl.restore();
+      }
       if (boatImg && boatImg.complete) {
-        const boatW = islandPixelRadius * 0.5;
-        const boatH = islandPixelRadius * 0.25;
-        ctxEl.drawImage(boatImg, centerX + islandPixelRadius + 6, centerY - boatH / 2, boatW, boatH);
+        ctxEl.drawImage(boatImg, drawX, drawY, boatW, boatH);
       } else {
-        const boatW = islandPixelRadius * 0.5;
-        const boatH = islandPixelRadius * 0.25;
         ctxEl.fillStyle = '#6b3e26';
-        ctxEl.fillRect(centerX + islandPixelRadius + 6, centerY - boatH / 2, boatW, boatH);
+        ctxEl.fillRect(drawX, drawY, boatW, boatH);
         ctxEl.strokeStyle = '#3b2b1f';
-        ctxEl.strokeRect(centerX + islandPixelRadius + 6, centerY - boatH / 2, boatW, boatH);
+        ctxEl.strokeRect(drawX, drawY, boatW, boatH);
       }
 
-      // avatars
+      // avatars (skip eliminated)
       for (const a of gameState.avatars) {
+        if (a.isAlive === false) continue;
         const { px, py } = worldToPixel(a.x, a.y);
         let fill = a.type === 'human' ? '#3b82f6' : '#ef476f';
         if (a.type === 'human' && a.ownerUsername === currentUser) fill = '#06b6d4';
