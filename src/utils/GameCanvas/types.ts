@@ -17,6 +17,7 @@ export type Island = {
 };
 
 export type Boat = {
+  size: number;
   x: number;
   y: number;
   interactionRadius?: number;

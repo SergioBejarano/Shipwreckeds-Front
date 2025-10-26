@@ -1,4 +1,3 @@
-// src/App.tsx (corregido: ya no pasa onBackToMenu)
 import { useState } from "react";
 import Portada from "./components/Portada";
 import Login from "./components/Login";
@@ -13,34 +12,34 @@ function App() {
   const [isHost, setIsHost] = useState(false);
 
   const handleIrLogin = () => setPantalla("login");
-
-  const handleLoginSuccess = (username: string) => {
-    setJugador(username);
-    setPantalla("menu");
-  };
-
-  const handleEnterLobby = (matchCode: string, asHost: boolean) => {
-    setCurrentMatchCode(matchCode);
-    setIsHost(asHost);
-    setPantalla("lobby");
-  };
-
+  const handleLoginSuccess = (username: string) => { setJugador(username); setPantalla("menu"); };
+  const handleEnterLobby = (matchCode: string, asHost: boolean) => { setCurrentMatchCode(matchCode); setIsHost(asHost); setPantalla("lobby"); };
   const handleStartGame = () => setPantalla("game");
 
   return (
-    <div className="app-container">
-      {/* Cada pantalla puede usar la clase .card para aparecer como un recuadro centrado */}
+    <div className="w-screen h-[100dvh] flex items-center justify-center bg-gray-100">
       {pantalla === "portada" && <Portada onIniciarSesion={handleIrLogin} />}
-      {pantalla === "login" && <Login onLoginSuccess={handleLoginSuccess} />}
-      {pantalla === "menu" && <CreateJoin username={jugador} onEnterLobby={handleEnterLobby} />}
+
+      {pantalla === "login" && (
+        <div className="w-full max-w-sm p-6 bg-white rounded-2xl shadow-lg">
+          <Login onLoginSuccess={handleLoginSuccess} />
+        </div>
+      )}
+
+      {pantalla === "menu" && (
+        <div className="w-full max-w-sm p-6 bg-white rounded-2xl shadow-lg">
+          <CreateJoin username={jugador} onEnterLobby={handleEnterLobby} />
+        </div>
+      )}
+
       {pantalla === "lobby" && currentMatchCode && (
-        <div className="card">
+        <div className="w-full max-w-3xl p-6 bg-white rounded-2xl shadow-lg">
           <Lobby code={currentMatchCode} currentUser={jugador} isHost={isHost} onStartGame={handleStartGame} />
         </div>
       )}
 
       {pantalla === "game" && currentMatchCode && (
-        <div className="card">
+        <div className="w-full max-w-5xl p-4 bg-white rounded-2xl shadow-lg">
           <GameCanvas matchCode={currentMatchCode} currentUser={jugador} />
         </div>
       )}

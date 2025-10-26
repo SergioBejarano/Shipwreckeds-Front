@@ -1,7 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./index.css"; // <- imprescindible
+
+// Importar WindiCSS
+import "virtual:windi.css";
+
+// Tus estilos globales opcionales (solo los que quieras conservar)
 
 import './styles/reset.css';
 import './styles/layout.css';
