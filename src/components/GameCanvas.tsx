@@ -1,5 +1,4 @@
-// src/components/GameCanvas.tsx
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import '../styles/game.css';
 import { useStompClient } from './GameCanvas/useStompClient';
 import { useBarcoImage } from './GameCanvas/useBarcoImage';
@@ -49,6 +48,9 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const [eliminationMessage, setEliminationMessage] = useState<string | null>(null);
   const eliminationRedirectRef = useRef<number | null>(null);
 
+  // NUEVO estado para el mensaje de victoria
+  const [resultModalOpen, setResultModalOpen] = useState(false);
+
   useInitialMatchBootstrap(matchCode, currentUser, setGameState, myAvatarIdRef);
   useNpcAliasRegistry(gameState, npcNameMapRef, npcAliasCounterRef);
   useInfiltratorTracking(gameState, currentUser, myAvatarIdRef, isInfiltratorRef);
@@ -82,6 +84,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
     if (myAvatarIdRef.current != null) return gameState.avatars.find((a: Avatar) => a.id === myAvatarIdRef.current);
     return undefined;
   }, [gameState, currentUser]);
+
   // movement hook: handles keyboard sending and provides click/mouse handlers
   const { handleCanvasClick, handleMouseMove, cursorRef } = useMovement({ clientRef, matchCode, currentUser, getMyAvatar, gameState });
 
@@ -213,8 +216,39 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
     setVoteResult(null);
   };
 
+  // ✅ NUEVO: abrir el modal cuando llega winnerMessage
+  useEffect(() => {
+    if (gameState?.winnerMessage && !resultModalOpen) {
+      setResultModalOpen(true);
+    }
+  }, [gameState, resultModalOpen]);
+
   return (
     <div className="game-container card">
+      {/* Winner modal */}
+      {resultModalOpen && gameState?.winnerMessage && (
+        <div className="result-overlay" role="dialog" aria-modal="true">
+          <div className="result-card animate-fadeIn">
+            <div className="result-anim">
+              <h2 className="result-title">{gameState.winnerMessage}</h2>
+            </div>
+            <p className="result-sub">¡Partida finalizada!</p>
+            <div style={{ marginTop: 14 }}>
+              <button
+                className="button"
+                onClick={() => {
+                  setResultModalOpen(false);
+                  window.location.href = '/';
+                }}
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Elimination overlay */}
       {eliminationMessage && (
         <div className="elimination-overlay">
           <div className="elimination-overlay__card">
@@ -230,6 +264,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
           </div>
         </div>
       )}
+
       <div className="header">
         <div className="title">Isla — Partida {matchCode}</div>
         <div className="small-muted">{connected ? "Conectado al servidor" : "Conectando..."}</div>
@@ -257,33 +292,29 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
 
       <canvas ref={canvasRef} />
 
-      {/* Vote button bottom-left */}
-      {(() => {
-        return (
-          <button
-            className="vote-button"
-            disabled={isInfiltrator}
-            title={isInfiltrator ? 'El infiltrado no puede iniciar votaciones' : 'Iniciar votación'}
-            onClick={async () => {
-              if (isInfiltratorRef.current) return; // extra guard
-              try {
-                const res = await fetch(`${BACKEND_BASE}/api/match/${matchCode}/startVote?username=${encodeURIComponent(currentUser)}`, { method: 'POST' });
-                if (!res.ok) {
-                  const text = await res.text();
-                  alert('No se pudo iniciar la votación: ' + text);
-                }
-              } catch (e) {
-                console.error(e);
-                alert('Error iniciando votación');
-              }
-            }}
-          >
-            Iniciar votación
-          </button>
-        );
-      })()}
+      {/* Vote button */}
+      <button
+        className="vote-button"
+        disabled={isInfiltrator}
+        title={isInfiltrator ? 'El infiltrado no puede iniciar votaciones' : 'Iniciar votación'}
+        onClick={async () => {
+          if (isInfiltratorRef.current) return;
+          try {
+            const res = await fetch(`${BACKEND_BASE}/api/match/${matchCode}/startVote?username=${encodeURIComponent(currentUser)}`, { method: 'POST' });
+            if (!res.ok) {
+              const text = await res.text();
+              alert('No se pudo iniciar la votación: ' + text);
+            }
+          } catch (e) {
+            console.error(e);
+            alert('Error iniciando votación');
+          }
+        }}
+      >
+        Iniciar votación
+      </button>
 
-      {/* Voting modal (extracted) */}
+      {/* Voting modals */}
       {voteModalOpen && (
         <VoteModal
           options={voteOptions}
@@ -294,8 +325,6 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
           isInfiltrator={isInfiltrator}
         />
       )}
-
-      {/* Vote result modal (extracted) */}
       {voteResult && (
         <VoteResultModal
           result={voteResult}
