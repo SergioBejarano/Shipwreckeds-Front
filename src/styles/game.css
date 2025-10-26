@@ -161,3 +161,50 @@
   background: #ef4444;
   box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35);
 }
+
+.elimination-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1400;
+}
+
+.elimination-overlay__card {
+  background: #ffffff;
+  padding: 32px 36px;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(2, 6, 23, 0.25);
+  text-align: center;
+  max-width: 420px;
+}
+
+.elimination-overlay__card h2 {
+  margin: 0 0 12px;
+  color: #ef4444;
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+
+.elimination-overlay__card p {
+  color: #043454;
+  margin: 0 0 20px;
+  font-size: 1rem;
+}
+
+.elimination-overlay__button {
+  background: linear-gradient(90deg, #0ea5e9, #06b6d4);
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(14, 165, 233, 0.35);
+}
+
+.elimination-overlay__button:hover {
+  filter: brightness(1.05);
+}

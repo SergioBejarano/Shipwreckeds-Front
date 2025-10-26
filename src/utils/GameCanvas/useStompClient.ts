@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Client } from '@stomp/stompjs';
 import type { IMessage } from '@stomp/stompjs';
-import type { GameState } from './types';
+import type { Avatar, GameState } from './types';
 
 const WS_URL = 'http://localhost:8080/ws';
 
@@ -37,8 +37,20 @@ export function useStompClient(
             setConnected(true);
             client.subscribe(`/topic/game/${matchCode}`, (msg: IMessage) => {
               try {
-                const payload = JSON.parse(msg.body) as GameState;
-                setGameState(payload);
+                const payload = JSON.parse(msg.body) as GameState & { avatars?: any[] };
+                const normalized: GameState = {
+                  ...payload,
+                  avatars: Array.isArray(payload.avatars)
+                    ? payload.avatars.map((avatar: any): Avatar => ({
+                        ...avatar,
+                        ownerUsername: avatar.ownerUsername ?? avatar.ownerusername ?? null,
+                        isInfiltrator: avatar.isInfiltrator ?? avatar.infiltrator ?? false,
+                        isAlive: avatar.isAlive ?? avatar.alive ?? true,
+                        displayName: avatar.displayName ?? avatar.displayname ?? null,
+                      }))
+                    : [],
+                };
+                setGameState(normalized);
               } catch (e) {
                 console.warn('Invalid game message', e);
               }

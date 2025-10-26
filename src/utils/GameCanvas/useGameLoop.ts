@@ -87,15 +87,15 @@ export function useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, ca
       const boatImg = barcoImgRef.current;
       const boatInfo = gameState.boat;
       const boatMetrics = boatInfo ? worldToPixel(boatInfo.x, boatInfo.y) : null;
-      const boatPx = boatMetrics ? boatMetrics.px : centerX + islandPixelRadius + 6 + (islandPixelRadius * 0.25);
-      const boatPy = boatMetrics ? boatMetrics.py : centerY;
-      const boatScale = boatMetrics ? boatMetrics.scale : scale;
-      const boatW = islandPixelRadius * 0.5;
-      const boatH = islandPixelRadius * 0.25;
+    const boatPx = boatMetrics ? boatMetrics.px : centerX + islandPixelRadius + 6 + (islandPixelRadius * 0.25);
+    const boatPy = boatMetrics ? boatMetrics.py : centerY;
+    const boatScale = boatMetrics ? boatMetrics.scale : scale;
+  const boatW = islandPixelRadius * 0.85;
+  const boatH = boatW * 0.55;
       const drawX = boatPx - boatW / 2;
       const drawY = boatPy - boatH / 2;
       if (boatInfo && boatInfo.interactionRadius) {
-        const interactionPx = boatInfo.interactionRadius * boatScale;
+  const interactionPx = boatInfo.interactionRadius * boatScale * 1.75;
         ctxEl.save();
         ctxEl.strokeStyle = 'rgba(6, 182, 212, 0.25)';
         ctxEl.setLineDash([8, 10]);
@@ -129,8 +129,8 @@ export function useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, ca
 
         ctxEl.beginPath();
         ctxEl.fillStyle = fill;
-        ctxEl.strokeStyle = a.isInfiltrator ? '#ffcc00' : '#ffffff';
-        ctxEl.lineWidth = a.isInfiltrator ? 3 : 2;
+  ctxEl.strokeStyle = '#ffffff';
+  ctxEl.lineWidth = 2;
         ctxEl.arc(px, py, 12, 0, Math.PI * 2);
         ctxEl.fill();
         ctxEl.stroke();

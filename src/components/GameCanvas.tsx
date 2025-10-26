@@ -1,6 +1,5 @@
 // src/components/GameCanvas.tsx
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { getMatch } from '../utils/api';
+import { useCallback, useRef, useState } from 'react';
 import '../styles/game.css';
 import { useStompClient } from './GameCanvas/useStompClient';
 import { useBarcoImage } from './GameCanvas/useBarcoImage';
@@ -9,6 +8,13 @@ import { useMovement } from '../utils/GameCanvas/useMovement';
 import type { Avatar, GameState } from '../utils/GameCanvas/types';
 import VoteModal from './GameCanvas/VoteModal';
 import VoteResultModal from './GameCanvas/VoteResultModal';
+import { useInitialMatchBootstrap } from './GameCanvas/hooks/useInitialMatchBootstrap';
+import { useNpcAliasRegistry } from './GameCanvas/hooks/useNpcAliasRegistry';
+import { useInfiltratorTracking } from './GameCanvas/hooks/useInfiltratorTracking';
+import { useCompletionNotifier } from './GameCanvas/hooks/useCompletionNotifier';
+import { useEliminationWatcher } from './GameCanvas/hooks/useEliminationWatcher';
+import { useEliminationRedirect } from './GameCanvas/hooks/useEliminationRedirect';
+import { useCanvasEvents } from './GameCanvas/hooks/useCanvasEvents';
 
 const BACKEND_BASE = 'http://localhost:8080';
 
@@ -35,9 +41,20 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const [voteResult, setVoteResult] = useState<VoteResultPayload | null>(null);
   const myAvatarIdRef = useRef<number | null>(null);
   const npcNameMapRef = useRef<Record<number, string>>({});
+  const npcAliasCounterRef = useRef<number>(100000);
   const isInfiltratorRef = useRef<boolean>(false);
   const completionShownRef = useRef<boolean>(false);
+  const myAliveRef = useRef<boolean | null>(null);
   const [fuelActionPending, setFuelActionPending] = useState(false);
+  const [eliminationMessage, setEliminationMessage] = useState<string | null>(null);
+  const eliminationRedirectRef = useRef<number | null>(null);
+
+  useInitialMatchBootstrap(matchCode, currentUser, setGameState, myAvatarIdRef);
+  useNpcAliasRegistry(gameState, npcNameMapRef, npcAliasCounterRef);
+  useInfiltratorTracking(gameState, currentUser, myAvatarIdRef, isInfiltratorRef);
+  useCompletionNotifier(gameState, completionShownRef);
+  useEliminationWatcher(gameState, currentUser, myAvatarIdRef, myAliveRef, setEliminationMessage);
+  useEliminationRedirect(eliminationMessage, eliminationRedirectRef);
 
   const fuelPercentage = Math.max(0, Math.min(100, gameState?.fuelPercentage ?? 0));
   const gameStatus = (gameState?.status ?? '').toUpperCase();
@@ -49,59 +66,13 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   // preload barco image
   useBarcoImage(barcoImgRef);
 
-  // fetch initial match state in case we missed server broadcast
-  useEffect(() => {
-    let mounted = true;
-    async function fetchInitial() {
-      try {
-        const m = await getMatch(matchCode);
-        if (!mounted || !m) return;
-        if (m.status === 'STARTED') {
-          const island = { cx: 0, cy: 0, radius: 100 };
-          const avatars: Avatar[] = [];
-          if (Array.isArray(m.players)) {
-            for (const p of m.players) {
-              const pos = p.position || { x: 0, y: 0 };
-              if (p.isInfiltrator) {
-                avatars.push({ id: p.id, type: 'npc', ownerUsername: null, x: pos.x, y: pos.y, isInfiltrator: true, isAlive: p.isAlive });
-              } else {
-                avatars.push({ id: p.id, type: 'human', ownerUsername: p.username, x: pos.x, y: pos.y, isInfiltrator: !!p.isInfiltrator, isAlive: p.isAlive });
-              }
-              if (p.username === currentUser) myAvatarIdRef.current = p.id;
-            }
-          }
-          if (Array.isArray(m.npcs)) {
-            for (const n of m.npcs) {
-              const pos = n.position || { x: 0, y: 0 };
-              avatars.push({ id: n.id, type: 'npc', ownerUsername: null, x: pos.x, y: pos.y, isInfiltrator: !!n.infiltrator, isAlive: n.active !== false });
-            }
-          }
-          setGameState({ code: matchCode, timestamp: Date.now(), island, avatars });
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-    fetchInitial();
-    return () => { mounted = false; };
-  }, [matchCode, currentUser]);
-
-  // assign random aliases to NPCs per-session
-  useEffect(() => {
-    if (!gameState) return;
-    const map = npcNameMapRef.current;
-    for (const a of gameState.avatars) {
-      if (a.type === 'npc' && !map[a.id]) {
-        const rand = Math.floor(Math.random() * 9000) + 1000;
-        map[a.id] = `NPC-${rand}`;
-      }
-    }
-  }, [gameState]);
-
   const getDisplayName = useCallback((a: Avatar) => {
-    if (a.displayName) return a.displayName;
+    if (a.type === 'npc') {
+      return npcNameMapRef.current[a.id] || a.displayName || `NPC-${npcAliasCounterRef.current}`;
+    }
     if (a.ownerUsername) return a.ownerUsername;
-    return npcNameMapRef.current[a.id] || `NPC-${a.id}`;
+    if (a.displayName) return a.displayName;
+    return `Jugador-${a.id}`;
   }, []);
 
   const getMyAvatar = useCallback((): Avatar | undefined => {
@@ -116,47 +87,6 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
 
   // canvas drawing loop (hook)
   useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, canvasWidth, canvasHeight, connected, getDisplayName, npcNameMapRef });
-
-  // keep local infiltrator flag up-to-date when we get GameState
-  useEffect(() => {
-    if (!gameState) { isInfiltratorRef.current = false; return; }
-    const me = gameState.avatars.find((a: Avatar) => a.ownerUsername === currentUser && a.type === 'human')
-      || (myAvatarIdRef.current != null ? gameState.avatars.find((a: Avatar) => a.id === myAvatarIdRef.current) : undefined);
-    isInfiltratorRef.current = !!(me && me.isInfiltrator);
-  }, [gameState, currentUser]);
-
-  useEffect(() => {
-    if (!gameState) { completionShownRef.current = false; return; }
-    const status = (gameState.status ?? '').toUpperCase();
-    const fuel = gameState.fuelPercentage ?? 0;
-    if (status === 'FINISHED' && fuel >= 100) {
-      if (!completionShownRef.current) {
-        completionShownRef.current = true;
-        alert('Partida terminada, ganaron los naufragos.');
-      }
-    } else if (status !== 'FINISHED') {
-      completionShownRef.current = false;
-    }
-  }, [gameState]);
-
-  // show victim alert if our own avatar transitions from alive -> dead
-  const myAliveRef = useRef<boolean | null>(null);
-  useEffect(() => {
-    if (!gameState) return;
-    const me = gameState.avatars.find((a: Avatar) => a.ownerUsername === currentUser && a.type === 'human')
-      || (myAvatarIdRef.current != null ? gameState.avatars.find((a: Avatar) => a.id === myAvatarIdRef.current) : undefined);
-    if (!me) return;
-    const nowAlive = me.isAlive !== false;
-    const prev = myAliveRef.current;
-    if (prev === null) {
-      myAliveRef.current = nowAlive;
-      return;
-    }
-    if (prev && !nowAlive) {
-      alert('Has sido eliminado.');
-    }
-    myAliveRef.current = nowAlive;
-  }, [gameState, currentUser]);
 
   const attemptElimination = useCallback(async (targetId: number) => {
     try {
@@ -253,18 +183,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const isNearBoat = !!(myAvatar && boatInfo && Math.hypot(myAvatar.x - boatInfo.x, myAvatar.y - boatInfo.y) <= interactionRadius);
   const isInfiltrator = !!(myAvatar && myAvatar.isInfiltrator);
 
-  // attach click/mouse handlers to canvas
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    canvas.addEventListener('click', handleEliminationClick as any);
-    canvas.addEventListener('mousemove', handleMouseMove as any);
-    canvas.addEventListener('mouseleave', () => { if (cursorRef) cursorRef.current = null; });
-    return () => {
-      canvas.removeEventListener('click', handleEliminationClick as any);
-      canvas.removeEventListener('mousemove', handleMouseMove as any);
-    };
-  }, [handleEliminationClick, handleMouseMove, cursorRef]);
+  useCanvasEvents(canvasRef, handleEliminationClick, handleMouseMove, cursorRef);
 
   // vote action passed to VoteModal
   const onVote = async (targetId: number) => {
@@ -296,6 +215,21 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
 
   return (
     <div className="game-container card">
+      {eliminationMessage && (
+        <div className="elimination-overlay">
+          <div className="elimination-overlay__card">
+            <h2>Has sido eliminado</h2>
+            <p>{eliminationMessage}</p>
+            <button
+              type="button"
+              className="elimination-overlay__button"
+              onClick={() => { window.location.href = '/'; }}
+            >
+              Volver al lobby
+            </button>
+          </div>
+        </div>
+      )}
       <div className="header">
         <div className="title">Isla — Partida {matchCode}</div>
         <div className="small-muted">{connected ? "Conectado al servidor" : "Conectando..."}</div>
@@ -357,6 +291,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
           onVote={onVote}
           onClose={() => setVoteModalOpen(false)}
           getDisplayName={getDisplayName}
+          isInfiltrator={isInfiltrator}
         />
       )}
 
