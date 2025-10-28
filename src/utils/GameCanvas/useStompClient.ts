@@ -12,7 +12,8 @@ export function useStompClient(
   setConnected: (v: boolean) => void,
   setVoteOptions?: (opts: any[]) => void,
   setVoteModalOpen?: (v: boolean) => void,
-  setVoteResult?: (r: any) => void
+  setVoteResult?: (r: any) => void,
+  onVoteStart?: (payload: any) => void
 ) {
   useEffect(() => {
     let mounted = true;
@@ -57,12 +58,16 @@ export function useStompClient(
             });
 
             // optional voting topics
-            if (setVoteOptions && setVoteModalOpen) {
+            if (onVoteStart || (setVoteOptions && setVoteModalOpen)) {
               client.subscribe(`/topic/game/${matchCode}/vote/start`, (msg: IMessage) => {
                 try {
                   const payload = JSON.parse(msg.body);
-                  setVoteOptions(payload.options || []);
-                  setVoteModalOpen(true);
+                  if (onVoteStart) {
+                    onVoteStart(payload);
+                  } else {
+                    setVoteOptions?.(payload.options || []);
+                    setVoteModalOpen?.(true);
+                  }
                 } catch (e) {
                   console.warn('Invalid vote start', e);
                 }
@@ -73,7 +78,21 @@ export function useStompClient(
               client.subscribe(`/topic/game/${matchCode}/vote/result`, (msg: IMessage) => {
                 try {
                   const payload = JSON.parse(msg.body);
-                  setVoteResult(payload);
+                  const countsSrc = payload?.counts ?? {};
+                  const normalizedCounts: Record<number, number> = {};
+                  if (countsSrc && typeof countsSrc === 'object') {
+                    Object.entries(countsSrc).forEach(([key, value]) => {
+                      const numericKey = Number(key);
+                      if (!Number.isNaN(numericKey)) {
+                        const numericValue = typeof value === 'number' ? value : Number(value);
+                        normalizedCounts[numericKey] = Number.isFinite(numericValue) ? numericValue : 0;
+                      }
+                    });
+                  }
+                  setVoteResult({
+                    ...payload,
+                    counts: normalizedCounts,
+                  });
                 } catch (e) {
                   console.warn('Invalid vote result', e);
                 }
@@ -101,5 +120,5 @@ export function useStompClient(
       clientRef.current = null;
       setConnected(false);
     };
-  }, [matchCode, clientRef, setGameState, setConnected, setVoteOptions, setVoteModalOpen, setVoteResult]);
+  }, [matchCode, clientRef, setGameState, setConnected, setVoteOptions, setVoteModalOpen, setVoteResult, onVoteStart]);
 }

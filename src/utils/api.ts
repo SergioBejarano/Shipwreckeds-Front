@@ -55,3 +55,13 @@ export async function startMatch(code: string, hostName: string): Promise<Match>
   const r = await fetch(url, { method: "POST" });
   return handleResponse(r);
 }
+
+export async function logout(username: string): Promise<void> {
+  const r = await fetch(`${API_BASE}/api/auth/logout/${encodeURIComponent(username)}`, {
+    method: "POST",
+  });
+  if (!r.ok && r.status !== 404) {
+    const text = await r.text().catch(() => "");
+    throw new Error(text || "No fue posible cerrar sesión");
+  }
+}

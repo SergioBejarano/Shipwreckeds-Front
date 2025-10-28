@@ -1,16 +1,18 @@
 import React, { useState } from "react";
-import { createMatch, joinMatch } from "../utils/api";
+import { createMatch, joinMatch, logout as logoutApi } from "../utils/api";
 
 interface CreateJoinProps {
   username: string;
   onEnterLobby: (matchCode: string, isHost: boolean) => void;
+  onLogout: () => void;
 }
 
-const CreateJoin: React.FC<CreateJoinProps> = ({ username, onEnterLobby }) => {
+const CreateJoin: React.FC<CreateJoinProps> = ({ username, onEnterLobby, onLogout }) => {
   const [joining, setJoining] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [loadingCreate, setLoadingCreate] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const handleCreate = async () => {
     setError("");
@@ -46,6 +48,25 @@ const CreateJoin: React.FC<CreateJoinProps> = ({ username, onEnterLobby }) => {
       <h2 className="text-3xl font-bold text-amber-800 mb-6 text-center drop-shadow-md">
         Bienvenido, {username}
       </h2>
+
+      <button
+        onClick={async () => {
+          setError("");
+          setLoggingOut(true);
+          try {
+            await logoutApi(username);
+            onLogout();
+          } catch (e: any) {
+            setError(e.message || "No fue posible cerrar sesión");
+          } finally {
+            setLoggingOut(false);
+          }
+        }}
+        className="self-end mb-4 text-sm font-semibold text-amber-700 hover:text-amber-900 underline"
+        disabled={loggingOut}
+      >
+        {loggingOut ? "Cerrando sesión..." : "Cerrar sesión"}
+      </button>
 
       <div className="w-full mb-6">
         <button

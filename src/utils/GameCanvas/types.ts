@@ -32,6 +32,9 @@ export type GameState = {
   boat?: Boat;
   fuelPercentage?: number;
   status?: string;
+  winnerMessage?: string | null;
+  fuelWindowOpen?: boolean;
+  fuelWindowSecondsRemaining?: number;
 };
 
 export type Props = {

@@ -240,6 +240,25 @@
   cursor: not-allowed;
 }
 
+.fuel-window {
+  margin-top: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.fuel-window.locked {
+  color: #c0392b;
+}
+
+.fuel-window.available {
+  color: #1e8449;
+}
+
+.fuel-window__countdown {
+  margin-left: 4px;
+  font-weight: 400;
+}
+
 .fuel-action-button.sabotage {
   background: #ef4444;
   box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35);
@@ -328,5 +347,3 @@
   0% { transform: scale(0.85); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
-
-

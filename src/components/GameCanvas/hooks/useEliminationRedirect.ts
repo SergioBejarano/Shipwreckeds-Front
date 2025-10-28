@@ -2,7 +2,8 @@ import { useEffect, type MutableRefObject } from 'react';
 
 export function useEliminationRedirect(
   eliminationMessage: string | null,
-  eliminationRedirectRef: MutableRefObject<number | null>
+  eliminationRedirectRef: MutableRefObject<number | null>,
+  onRedirect: () => void
 ) {
   useEffect(() => {
     if (!eliminationMessage) {
@@ -10,7 +11,7 @@ export function useEliminationRedirect(
     }
 
     const timeoutId = window.setTimeout(() => {
-      window.location.href = '/';
+      onRedirect();
     }, 3500);
 
     eliminationRedirectRef.current = timeoutId;
@@ -18,7 +19,7 @@ export function useEliminationRedirect(
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [eliminationMessage, eliminationRedirectRef]);
+  }, [eliminationMessage, eliminationRedirectRef, onRedirect]);
 
   useEffect(
     () => () => {

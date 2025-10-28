@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
 import type { Avatar } from '../../utils/GameCanvas/types';
 
 interface Props {
@@ -8,18 +9,27 @@ interface Props {
   onClose: () => void; // se mantiene por compatibilidad pero no se muestra opción de cerrar
   getDisplayName: (a: Avatar) => string;
   isInfiltrator: boolean;
+  durationSeconds: number;
 }
 
-export default function VoteModal({ options, hasVoted, onVote, onClose, getDisplayName, isInfiltrator }: Props) {
-  const [timeLeft, setTimeLeft] = useState(60);
+export default function VoteModal({ options, hasVoted, onVote, onClose: _onClose, getDisplayName, isInfiltrator, durationSeconds }: Props) {
+  const [timeLeft, setTimeLeft] = useState(durationSeconds);
+  const timeoutTriggeredRef = useRef<boolean>(false);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
+    setTimeLeft(durationSeconds);
+    timeoutTriggeredRef.current = false;
+  }, [durationSeconds, options]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setTimeLeft((prev: number) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // Si el tiempo se acaba y no se ha votado, cuenta como abstención
-          onVote(-1);
+          if (!isInfiltrator && !hasVoted && !timeoutTriggeredRef.current) {
+            timeoutTriggeredRef.current = true;
+            void onVote(-1);
+          }
           return 0;
         }
         return prev - 1;
@@ -27,7 +37,7 @@ export default function VoteModal({ options, hasVoted, onVote, onClose, getDispl
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [onVote]);
+  }, [durationSeconds, hasVoted, isInfiltrator, onVote]);
 
   return (
     <div
@@ -36,8 +46,8 @@ export default function VoteModal({ options, hasVoted, onVote, onClose, getDispl
       aria-modal="true"
     >
       <div
-        className="bg-white p-5 rounded-lg shadow-xl min-w-[320px] max-w-xl w-[90%]"
-        onClick={(e) => e.stopPropagation()} /* evita cerrar si accidentalmente hay handler en padre */
+  className="bg-white p-5 rounded-lg shadow-xl min-w-[320px] max-w-xl w-[90%]"
+  onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()} /* evita cerrar si accidentalmente hay handler en padre */
       >
         {isInfiltrator ? (
           <p className="font-bold text-center my-3">Ha iniciado una votación</p>

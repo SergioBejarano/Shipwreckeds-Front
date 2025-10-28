@@ -24,9 +24,10 @@ type Props = {
   currentUser: string;
   canvasWidth?: number;
   canvasHeight?: number;
+  onExitToMenu: () => void;
 };
 
-export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, canvasHeight = 600 }: Props) {
+export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, canvasHeight = 600, onExitToMenu }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const barcoImgRef = useRef<HTMLImageElement | null>(null);
   const clientRef = useRef<any | null>(null);
@@ -36,6 +37,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   // voting UI state
   const [voteModalOpen, setVoteModalOpen] = useState(false);
   const [voteOptions, setVoteOptions] = useState<Avatar[]>([]);
+  const [voteDuration, setVoteDuration] = useState<number>(20);
   const [hasVoted, setHasVoted] = useState(false);
   const [voteResult, setVoteResult] = useState<VoteResultPayload | null>(null);
   const myAvatarIdRef = useRef<number | null>(null);
@@ -56,14 +58,29 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   useInfiltratorTracking(gameState, currentUser, myAvatarIdRef, isInfiltratorRef);
   useCompletionNotifier(gameState, completionShownRef);
   useEliminationWatcher(gameState, currentUser, myAvatarIdRef, myAliveRef, setEliminationMessage);
-  useEliminationRedirect(eliminationMessage, eliminationRedirectRef);
+  useEliminationRedirect(eliminationMessage, eliminationRedirectRef, onExitToMenu);
 
   const fuelPercentage = Math.max(0, Math.min(100, gameState?.fuelPercentage ?? 0));
   const gameStatus = (gameState?.status ?? '').toUpperCase();
   const isGameFinished = gameStatus === 'FINISHED';
+  const fuelWindowOpen = !!gameState?.fuelWindowOpen;
+  const fuelWindowSecondsRemaining = gameState?.fuelWindowSecondsRemaining ?? 0;
+  const fuelWindowMessage = fuelWindowOpen ? 'Tanque de gasolina disponible.' : 'Tanque de gasolina bloqueado.';
 
   // STOMP client + subscriptions (moved to hook)
-  useStompClient(matchCode, clientRef as any, setGameState, setConnected, setVoteOptions, setVoteModalOpen, setVoteResult);
+  const handleVoteStart = useCallback((payload: { options?: Avatar[]; durationSeconds?: number } | null) => {
+    const incomingOptions = payload && Array.isArray(payload.options) ? payload.options : [];
+    setVoteOptions(incomingOptions);
+    const duration = payload && typeof payload.durationSeconds !== 'undefined'
+      ? Number(payload.durationSeconds)
+      : NaN;
+    setVoteDuration(Number.isFinite(duration) && duration > 0 ? duration : 20);
+    setHasVoted(false);
+    setVoteResult(null);
+    setVoteModalOpen(true);
+  }, [setVoteModalOpen, setHasVoted, setVoteOptions, setVoteDuration, setVoteResult]);
+
+  useStompClient(matchCode, clientRef as any, setGameState, setConnected, setVoteOptions, setVoteModalOpen, setVoteResult, handleVoteStart);
 
   // preload barco image
   useBarcoImage(barcoImgRef);
@@ -149,6 +166,10 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
 
   const handleFuelAction = useCallback(async (action: 'FILL' | 'SABOTAGE') => {
     if (!gameState || isGameFinished) return;
+    if (!fuelWindowOpen) {
+      alert('Tanque de gasolina bloqueado. Espera a que esté disponible.');
+      return;
+    }
     const mine = getMyAvatar();
     const boat = gameState.boat;
     if (!mine || !boat) {
@@ -157,7 +178,8 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
     }
     const dist = Math.hypot(mine.x - boat.x, mine.y - boat.y);
     const radius = boat.interactionRadius ?? 25;
-    if (dist > radius) {
+    const requiresProximity = action === 'FILL' || !mine.isInfiltrator;
+    if (requiresProximity && dist > radius) {
       alert('Debes acercarte al barco.');
       return;
     }
@@ -178,18 +200,20 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
     } finally {
       setFuelActionPending(false);
     }
-  }, [currentUser, gameState, getMyAvatar, isGameFinished, matchCode]);
+  }, [currentUser, fuelWindowOpen, gameState, getMyAvatar, isGameFinished, matchCode]);
 
   const myAvatar = getMyAvatar();
   const boatInfo = gameState?.boat;
   const interactionRadius = boatInfo?.interactionRadius ?? 25;
   const isNearBoat = !!(myAvatar && boatInfo && Math.hypot(myAvatar.x - boatInfo.x, myAvatar.y - boatInfo.y) <= interactionRadius);
   const isInfiltrator = !!(myAvatar && myAvatar.isInfiltrator);
-
   useCanvasEvents(canvasRef, handleEliminationClick, handleMouseMove, cursorRef);
 
   // vote action passed to VoteModal
-  const onVote = async (targetId: number) => {
+  const onVote = useCallback(async (targetId: number) => {
+    if (hasVoted) {
+      return;
+    }
     try {
       const res = await fetch(`${BACKEND_BASE}/api/match/${matchCode}/vote`, {
         method: 'POST',
@@ -206,15 +230,21 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
       console.error(e);
       alert('Error al enviar voto');
     }
-  };
+  }, [currentUser, hasVoted, matchCode]);
 
   const handleCloseVoteResult = () => {
     if (voteResult?.expelledType === 'human') {
-      window.location.href = '/';
+      onExitToMenu();
       return;
     }
     setVoteResult(null);
   };
+
+  useEffect(() => {
+    if (voteResult) {
+      setVoteModalOpen(false);
+    }
+  }, [voteResult]);
 
   // ✅ NUEVO: abrir el modal cuando llega winnerMessage
   useEffect(() => {
@@ -238,7 +268,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
                 className="button"
                 onClick={() => {
                   setResultModalOpen(false);
-                  window.location.href = '/';
+                  onExitToMenu();
                 }}
               >
                 Aceptar
@@ -257,7 +287,10 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
             <button
               type="button"
               className="elimination-overlay__button"
-              onClick={() => { window.location.href = '/'; }}
+              onClick={() => {
+                setEliminationMessage(null);
+                onExitToMenu();
+              }}
             >
               Volver al lobby
             </button>
@@ -275,14 +308,27 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
           <div className="fuel-progress__fill" style={{ width: `${fuelPercentage}%` }} />
         </div>
         <div className="fuel-meta">
-          <span>
-            Combustible del barco: {fuelPercentage.toFixed(0)}%
-            {isGameFinished ? ' — Partida finalizada' : ''}
-          </span>
-          {isNearBoat && !isGameFinished && (
+          <div>
+            <span>
+              Combustible del barco: {fuelPercentage.toFixed(0)}%
+              {isGameFinished ? ' — Partida finalizada' : ''}
+            </span>
+            <div className={`fuel-window${fuelWindowOpen ? ' available' : ' locked'}`}>
+              {fuelWindowMessage}
+              {fuelWindowSecondsRemaining > 0 && (
+                <span className="fuel-window__countdown">
+                  {fuelWindowOpen ? ' Se bloqueará en ' : ' Disponible en '}
+                  {fuelWindowSecondsRemaining}s
+                </span>
+              )}
+            </div>
+          </div>
+          {((isInfiltrator) || isNearBoat) && !isGameFinished && (
             <button
               className={`fuel-action-button${isInfiltrator ? ' sabotage' : ''}`}
               onClick={() => handleFuelAction(isInfiltrator ? 'SABOTAGE' : 'FILL')}
+              disabled={!fuelWindowOpen || fuelActionPending}
+              title={fuelWindowOpen ? (isInfiltrator ? undefined : (isNearBoat ? undefined : 'Debes acercarte al barco')) : 'Tanque de gasolina bloqueado temporalmente'}
             >
               {fuelActionPending ? 'Procesando...' : (isInfiltrator ? 'Sabotear' : 'Llenar tanque')}
             </button>
@@ -323,6 +369,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
           onClose={() => setVoteModalOpen(false)}
           getDisplayName={getDisplayName}
           isInfiltrator={isInfiltrator}
+          durationSeconds={voteDuration}
         />
       )}
       {voteResult && (
