@@ -14,11 +14,24 @@ export function useNpcAliasRegistry(
     }
 
     const map = npcNameMapRef.current;
+    const aliasOwners = new Map<string, number>();
     const used = new Set<string>();
     const nextAliases: Record<number, string> = {};
 
-    const tryUseAlias = (candidate: string | null | undefined) => {
+    for (const [idStr, alias] of Object.entries(map)) {
+      if (typeof alias === 'string' && NPC_ALIAS_REGEX.test(alias)) {
+        const idNum = Number(idStr);
+        aliasOwners.set(alias, idNum);
+        used.add(alias);
+      }
+    }
+
+    const tryUseAlias = (candidate: string | null | undefined, id: number) => {
       if (!candidate || !NPC_ALIAS_REGEX.test(candidate) || used.has(candidate)) {
+        const owner = candidate ? aliasOwners.get(candidate) : undefined;
+        if (owner === id) {
+          return candidate;
+        }
         return null;
       }
       const numeric = parseInt(candidate.split('-')[1], 10);
@@ -44,17 +57,14 @@ export function useNpcAliasRegistry(
       }
 
       const currentAlias = typeof map[avatar.id] === 'string' ? map[avatar.id] : null;
-      const serverAlias = typeof avatar.displayName === 'string' ? avatar.displayName : null;
-      const alias = tryUseAlias(currentAlias) ?? tryUseAlias(serverAlias) ?? generateAlias();
+      if (currentAlias) {
+        used.delete(currentAlias);
+      }
+      const alias = tryUseAlias(currentAlias, avatar.id)
+        ?? generateAlias();
       nextAliases[avatar.id] = alias;
       used.add(alias);
-    }
-
-    for (const key of Object.keys(map)) {
-      const idNum = Number(key);
-      if (!Number.isNaN(idNum) && !(idNum in nextAliases)) {
-        delete map[idNum];
-      }
+      aliasOwners.set(alias, avatar.id);
     }
 
     for (const [idStr, alias] of Object.entries(nextAliases)) {

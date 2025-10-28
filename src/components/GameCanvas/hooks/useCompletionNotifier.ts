@@ -14,11 +14,8 @@ export function useCompletionNotifier(
     const status = (gameState.status ?? '').toUpperCase();
     const fuelPercentage = gameState.fuelPercentage ?? 0;
 
-    if (status === 'FINISHED' && fuelPercentage >= 100) {
-      if (!completionShownRef.current) {
-        completionShownRef.current = true;
-        alert('Partida terminada, ganaron los naufragos.');
-      }
+    if (status === 'FINISHED' && fuelPercentage >= 100 && !completionShownRef.current) {
+      completionShownRef.current = true;
       return;
     }
 

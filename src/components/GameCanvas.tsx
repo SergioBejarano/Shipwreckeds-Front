@@ -43,6 +43,10 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const myAvatarIdRef = useRef<number | null>(null);
   const npcNameMapRef = useRef<Record<number, string>>({});
   const npcAliasCounterRef = useRef<number>(100000);
+  useEffect(() => {
+    npcNameMapRef.current = {};
+    npcAliasCounterRef.current = 0;
+  }, [matchCode]);
   const isInfiltratorRef = useRef<boolean>(false);
   const completionShownRef = useRef<boolean>(false);
   const myAliveRef = useRef<boolean | null>(null);
