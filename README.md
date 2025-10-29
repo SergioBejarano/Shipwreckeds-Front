@@ -1,73 +1,37 @@
-# React + TypeScript + Vite
+# Shipwreckeds Front
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interfaz web del juego Shipwreckeds, construida con React y TypeScript. Este repositorio contiene la capa de presentación que se comunica con los servicios de backend para gestionar autenticación, lobby y partidas en tiempo real.
 
-Currently, two official plugins are available:
+## Tecnologías principales
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Vite**: bundler y servidor de desarrollo para aplicaciones modernas en React.
+- **React + TypeScript**: base de la interfaz, tipado estático y componentes reutilizables.
+- **Tailwind CSS**: sistema de utilidades para estilos y maquetación.
+- **StompJS**: comunicación en tiempo real mediante WebSockets.
 
-## React Compiler
+## Puesta en marcha
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Por defecto la aplicación se sirve en `http://localhost:5173`. Ajustar las variables de entorno si el backend se ejecuta en otra ubicación.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Estructura del proyecto
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/
+	components/        Componentes de UI para pantallas principales
+	styles/            Hojas CSS para layouts y formularios
+	utils/             Hooks y utilidades compartidas
+	assets/            Recursos estáticos (imágenes, fuentes)
+```
+
+Los componentes de juego (`src/components/GameCanvas`) encapsulan la lógica de interacción en tiempo real (canvas, eventos de eliminación, modal de votación, etc.). Los hooks en `src/utils/GameCanvas` abstraen la comunicación con el servidor, gestión de bucles de juego y movimiento de personajes.
+
+## Scripts útiles
+
+- `npm run dev`: inicia el servidor de desarrollo con recarga en caliente.
+- `npm run build`: genera la versión optimizada para producción.
+- `npm run preview`: sirve la build generada para verificación.
