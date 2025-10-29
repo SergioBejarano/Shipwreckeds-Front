@@ -20,7 +20,7 @@ import { EliminationOverlay } from './GameCanvas/EliminationOverlay';
 import { useFuelControls } from './GameCanvas/hooks/useFuelControls';
 import { useEliminationInteraction } from './GameCanvas/hooks/useEliminationInteraction';
 
-const BACKEND_BASE = 'http://localhost:8080';
+const BACKEND_BASE = 'https://shipwreckeds-bhc3cad8bkh7bzgy.eastus-01.azurewebsites.net';
 
 type VoteResultPayload = { counts: Record<number, number>; expelledId?: number | null; expelledType?: string; message?: string; abstentions?: number };
 
