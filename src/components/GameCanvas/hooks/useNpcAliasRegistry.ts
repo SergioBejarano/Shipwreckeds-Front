@@ -56,11 +56,13 @@ export function useNpcAliasRegistry(
         continue;
       }
 
+      const serverAlias = typeof avatar.displayName === 'string' ? avatar.displayName : null;
       const currentAlias = typeof map[avatar.id] === 'string' ? map[avatar.id] : null;
       if (currentAlias) {
         used.delete(currentAlias);
       }
-      const alias = tryUseAlias(currentAlias, avatar.id)
+      const alias = tryUseAlias(serverAlias, avatar.id)
+        ?? tryUseAlias(currentAlias, avatar.id)
         ?? generateAlias();
       nextAliases[avatar.id] = alias;
       used.add(alias);

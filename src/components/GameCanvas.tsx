@@ -17,7 +17,7 @@ import { useCanvasEvents } from './GameCanvas/hooks/useCanvasEvents';
 
 const BACKEND_BASE = 'http://localhost:8080';
 
-type VoteResultPayload = { counts: Record<number, number>; expelledId?: number | null; expelledType?: string; message?: string };
+type VoteResultPayload = { counts: Record<number, number>; expelledId?: number | null; expelledType?: string; message?: string; abstentions?: number };
 
 type Props = {
   matchCode: string;
@@ -45,7 +45,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const npcAliasCounterRef = useRef<number>(100000);
   useEffect(() => {
     npcNameMapRef.current = {};
-    npcAliasCounterRef.current = 0;
+    npcAliasCounterRef.current = 100000;
   }, [matchCode]);
   const isInfiltratorRef = useRef<boolean>(false);
   const completionShownRef = useRef<boolean>(false);
@@ -54,7 +54,6 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const [eliminationMessage, setEliminationMessage] = useState<string | null>(null);
   const eliminationRedirectRef = useRef<number | null>(null);
 
-  // NUEVO estado para el mensaje de victoria
   const [resultModalOpen, setResultModalOpen] = useState(false);
 
   useInitialMatchBootstrap(matchCode, currentUser, setGameState, myAvatarIdRef);
@@ -71,7 +70,6 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const fuelWindowSecondsRemaining = gameState?.fuelWindowSecondsRemaining ?? 0;
   const fuelWindowMessage = fuelWindowOpen ? 'Tanque de gasolina disponible.' : 'Tanque de gasolina bloqueado.';
 
-  // STOMP client + subscriptions (moved to hook)
   const handleVoteStart = useCallback((payload: { options?: Avatar[]; durationSeconds?: number } | null) => {
     const incomingOptions = payload && Array.isArray(payload.options) ? payload.options : [];
     setVoteOptions(incomingOptions);
@@ -86,7 +84,6 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
 
   useStompClient(matchCode, clientRef as any, setGameState, setConnected, setVoteOptions, setVoteModalOpen, setVoteResult, handleVoteStart);
 
-  // preload barco image
   useBarcoImage(barcoImgRef);
 
   const getDisplayName = useCallback((a: Avatar) => {
@@ -250,7 +247,6 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
     }
   }, [voteResult]);
 
-  // ✅ NUEVO: abrir el modal cuando llega winnerMessage
   useEffect(() => {
     if (gameState?.winnerMessage && !resultModalOpen) {
       setResultModalOpen(true);

@@ -1,6 +1,6 @@
 import type { Avatar } from '../../utils/GameCanvas/types';
 
-type VoteResultPayload = { counts: Record<number, number>; expelledId?: number | null; expelledType?: string; message?: string };
+type VoteResultPayload = { counts: Record<number, number>; expelledId?: number | null; expelledType?: string; message?: string; abstentions?: number };
 
 interface Props {
   result: VoteResultPayload;
@@ -27,6 +27,12 @@ export default function VoteResultModal({ result, gameState, npcNameMap, onClose
               </div>
             );
           })}
+          {(result.abstentions ?? 0) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: '#f0f1f5', borderRadius: 6, marginBottom: 6 }}>
+              <div>Abstenciones</div>
+              <div><strong>{result.abstentions}</strong></div>
+            </div>
+          )}
         </div>
         <div style={{ marginTop: 12 }}>
           <div>{result.message}</div>
