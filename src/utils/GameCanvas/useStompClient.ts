@@ -3,7 +3,7 @@ import { Client } from '@stomp/stompjs';
 import type { IMessage } from '@stomp/stompjs';
 import type { Avatar, GameState } from './types';
 
-const WS_URL = 'http://localhost:8080/ws';
+const WS_URL = 'https://shipwreckeds-bhc3cad8bkh7bzgy.eastus-01.azurewebsites.net/ws';
 
 export function useStompClient(
   matchCode: string,

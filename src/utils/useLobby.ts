@@ -37,7 +37,7 @@ export function useLobby(
 
       if (!mounted) return;
 
-      const socket = new SockJS("http://localhost:8080/ws");
+      const socket = new SockJS("https://shipwreckeds-bhc3cad8bkh7bzgy.eastus-01.azurewebsites.net/ws");
       const client = new Client({
         webSocketFactory: () => socket as any,
         debug: () => {},

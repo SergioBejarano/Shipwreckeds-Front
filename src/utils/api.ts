@@ -4,7 +4,7 @@ export type Player = { id: number; username: string; skinId?: string; position?:
 export type Npc = { id: number; skinId?: string; position?: Position; active?: boolean; movementSpeed?: number; infiltrator?: boolean };
 export type Match = { id?: number; code: string; players: Player[]; npcs?: Npc[]; status?: string; timerSeconds?: number; infiltrator?: Player | null };
 
-const API_BASE = "http://localhost:8080";
+const API_BASE = "https://shipwreckeds-bhc3cad8bkh7bzgy.eastus-01.azurewebsites.net";
 
 async function handleResponse(res: Response) {
   if (!res.ok) {
