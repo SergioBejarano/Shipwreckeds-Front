@@ -2,8 +2,7 @@ import { useEffect } from 'react';
 import { Client } from '@stomp/stompjs';
 import type { IMessage } from '@stomp/stompjs';
 import type { Avatar, GameState } from './types';
-
-const WS_URL = 'https://shipwreckeds-bhc3cad8bkh7bzgy.eastus-01.azurewebsites.net/ws';
+import { WS_ENDPOINT } from '../api';
 
 export function useStompClient(
   matchCode: string,
@@ -20,7 +19,6 @@ export function useStompClient(
 
     const init = async () => {
       try {
-        // shim global for sockjs-client modules that expect Node global
         try { (window as any).global = (window as any).global || window; } catch (e) {}
 
         const mod = await import('sockjs-client');
@@ -28,7 +26,7 @@ export function useStompClient(
 
         if (!mounted) return;
 
-        const socket = new SockJS(WS_URL);
+        const socket = new SockJS(WS_ENDPOINT);
         const client = new Client({
           webSocketFactory: () => socket as any,
           reconnectDelay: 2000,

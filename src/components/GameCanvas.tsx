@@ -19,8 +19,9 @@ import { ResultOverlay } from './GameCanvas/ResultOverlay';
 import { EliminationOverlay } from './GameCanvas/EliminationOverlay';
 import { useFuelControls } from './GameCanvas/hooks/useFuelControls';
 import { useEliminationInteraction } from './GameCanvas/hooks/useEliminationInteraction';
+import { API_BASE } from '../utils/api';
 
-const BACKEND_BASE = 'https://shipwreckeds-bhc3cad8bkh7bzgy.eastus-01.azurewebsites.net';
+const BACKEND_BASE = API_BASE;
 
 type VoteResultPayload = { counts: Record<number, number>; expelledId?: number | null; expelledType?: string; message?: string; abstentions?: number };
 
