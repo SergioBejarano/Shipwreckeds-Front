@@ -8,8 +8,8 @@ export type LoginResponse = { player: Player; tokens: CognitoTokens };
 
 const env = typeof import.meta !== "undefined" ? (import.meta as any).env : undefined;
 
-//export const API_BASE = "http://localhost:8080";
-export const API_BASE = "https://shipwreckeds-bhc3cad8bkh7bzgy.eastus-01.azurewebsites.net";
+export const API_BASE = "http://alb-shipwreckeds-973139340.us-east-1.elb.amazonaws.com";
+//export const API_BASE = "https://shipwreckeds-bhc3cad8bkh7bzgy.eastus-01.azurewebsites.net";
 
 export const WS_BASE = API_BASE;
 export const WS_ENDPOINT = `${WS_BASE}/ws`;

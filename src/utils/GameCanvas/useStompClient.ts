@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Client } from '@stomp/stompjs';
 import type { IMessage } from '@stomp/stompjs';
-import type { Avatar, GameState } from './types';
+import type { Avatar, GameState, VoteResultPayload } from './types';
 import { WS_ENDPOINT } from '../api';
 
 export function useStompClient(
@@ -34,20 +34,48 @@ export function useStompClient(
           heartbeatOutgoing: 20000,
           onConnect: () => {
             setConnected(true);
+            const normalizeAvatar = (avatar: any): Avatar => ({
+              ...avatar,
+              ownerUsername: avatar.ownerUsername ?? avatar.ownerusername ?? null,
+              isInfiltrator: avatar.isInfiltrator ?? avatar.infiltrator ?? false,
+              isAlive: avatar.isAlive ?? avatar.alive ?? true,
+              displayName: avatar.displayName ?? avatar.displayname ?? null,
+            });
+
+            const normalizeVoteResult = (payload: any): VoteResultPayload => {
+              if (!payload || typeof payload !== 'object') {
+                return { counts: {} };
+              }
+              const countsSrc = payload.counts ?? {};
+              const normalizedCounts: Record<number, number> = {};
+              if (countsSrc && typeof countsSrc === 'object') {
+                Object.entries(countsSrc).forEach(([key, value]) => {
+                  const numericKey = Number(key);
+                  if (!Number.isNaN(numericKey)) {
+                    const numericValue = typeof value === 'number' ? value : Number(value);
+                    normalizedCounts[numericKey] = Number.isFinite(numericValue) ? numericValue : 0;
+                  }
+                });
+              }
+              return {
+                counts: normalizedCounts,
+                expelledId: typeof payload.expelledId === 'number' ? payload.expelledId : (payload.expelledId != null ? Number(payload.expelledId) : undefined),
+                expelledType: payload.expelledType ?? payload.expelledtype,
+                message: payload.message,
+                abstentions: typeof payload.abstentions === 'number' ? payload.abstentions : Number(payload.abstentions ?? 0),
+              };
+            };
+
             client.subscribe(`/topic/game/${matchCode}`, (msg: IMessage) => {
               try {
-                const payload = JSON.parse(msg.body) as GameState & { avatars?: any[] };
+                const payload = JSON.parse(msg.body) as GameState & { avatars?: any[]; voteOptions?: any[] };
                 const normalized: GameState = {
                   ...payload,
-                  avatars: Array.isArray(payload.avatars)
-                    ? payload.avatars.map((avatar: any): Avatar => ({
-                        ...avatar,
-                        ownerUsername: avatar.ownerUsername ?? avatar.ownerusername ?? null,
-                        isInfiltrator: avatar.isInfiltrator ?? avatar.infiltrator ?? false,
-                        isAlive: avatar.isAlive ?? avatar.alive ?? true,
-                        displayName: avatar.displayName ?? avatar.displayname ?? null,
-                      }))
-                    : [],
+                  avatars: Array.isArray(payload.avatars) ? payload.avatars.map(normalizeAvatar) : [],
+                  voteOptions: Array.isArray(payload.voteOptions)
+                    ? payload.voteOptions.map(normalizeAvatar)
+                    : payload.voteOptions ?? null,
+                  lastVoteResult: payload.lastVoteResult ? normalizeVoteResult(payload.lastVoteResult) : payload.lastVoteResult ?? null,
                 };
                 setGameState(normalized);
               } catch (e) {
@@ -76,21 +104,7 @@ export function useStompClient(
               client.subscribe(`/topic/game/${matchCode}/vote/result`, (msg: IMessage) => {
                 try {
                   const payload = JSON.parse(msg.body);
-                  const countsSrc = payload?.counts ?? {};
-                  const normalizedCounts: Record<number, number> = {};
-                  if (countsSrc && typeof countsSrc === 'object') {
-                    Object.entries(countsSrc).forEach(([key, value]) => {
-                      const numericKey = Number(key);
-                      if (!Number.isNaN(numericKey)) {
-                        const numericValue = typeof value === 'number' ? value : Number(value);
-                        normalizedCounts[numericKey] = Number.isFinite(numericValue) ? numericValue : 0;
-                      }
-                    });
-                  }
-                  setVoteResult({
-                    ...payload,
-                    counts: normalizedCounts,
-                  });
+                  setVoteResult(normalizeVoteResult(payload));
                 } catch (e) {
                   console.warn('Invalid vote result', e);
                 }

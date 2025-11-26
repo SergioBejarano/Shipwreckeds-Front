@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import { Client } from "@stomp/stompjs";
 import type { Frame, IMessage } from "@stomp/stompjs";
+import { WS_ENDPOINT } from "./api";
 
 type LobbyCallback = (payload: any) => void;
 
@@ -37,8 +38,20 @@ export function useLobby(
 
       if (!mounted) return;
 
-      const socket = new SockJS("https://shipwreckeds-bhc3cad8bkh7bzgy.eastus-01.azurewebsites.net/ws");
-      //const socket = new SockJS("http://localhost:8080/ws");
+      const socketUrl = (() => {
+        if (!WS_ENDPOINT) return "/ws";
+        if (WS_ENDPOINT.startsWith("http")) {
+          return WS_ENDPOINT;
+        }
+        if (typeof window !== "undefined") {
+          const base = window.location.origin.replace(/\/$/, "");
+          const suffix = WS_ENDPOINT.startsWith("/") ? WS_ENDPOINT : `/${WS_ENDPOINT}`;
+          return `${base}${suffix}`;
+        }
+        return WS_ENDPOINT;
+      })();
+
+      const socket = new SockJS(socketUrl);
       const client = new Client({
         webSocketFactory: () => socket as any,
         debug: () => {},

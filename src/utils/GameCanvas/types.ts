@@ -10,6 +10,14 @@ export type Avatar = {
   displayName?: string | null;
 };
 
+export type VoteResultPayload = {
+  counts: Record<number, number>;
+  expelledId?: number | null;
+  expelledType?: string;
+  message?: string;
+  abstentions?: number;
+};
+
 export type Island = {
   cx: number;
   cy: number;
@@ -35,6 +43,11 @@ export type GameState = {
   winnerMessage?: string | null;
   fuelWindowOpen?: boolean;
   fuelWindowSecondsRemaining?: number;
+  votingActive?: boolean;
+  voteEndsAtEpochMs?: number;
+  voteOptions?: Avatar[] | null;
+  lastVoteResult?: VoteResultPayload | null;
+  lastVoteResultEpochMs?: number;
 };
 
 export type Props = {

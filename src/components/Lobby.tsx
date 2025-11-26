@@ -1,5 +1,5 @@
 // src/components/Lobby.tsx
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useLobby } from "../utils/useLobby";
 import { getMatch, startMatch } from "../utils/api";
 import lobbyImg from "../assets/lobby.jpg";
@@ -16,17 +16,40 @@ const Lobby: React.FC<LobbyProps> = ({ code, currentUser, isHost, onStartGame })
   const [match, setMatch] = useState<Match | null>(null);
   const [starting, setStarting] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-    getMatch(code).then((m) => { if (mounted) setMatch(m); }).catch(console.warn);
-    return () => { mounted = false; };
+  const fetchMatch = useCallback(async () => {
+    try {
+      const latest = await getMatch(code);
+      setMatch(latest);
+    } catch (err) {
+      console.warn("No fue posible actualizar el lobby", err);
+    }
   }, [code]);
+
+  useEffect(() => {
+    fetchMatch();
+  }, [fetchMatch]);
+
+  useEffect(() => {
+    // Poll as a safety net when websocket updates are delayed or lost
+    const interval = setInterval(fetchMatch, 4000);
+    return () => clearInterval(interval);
+  }, [fetchMatch]);
+
+  const handleLobbyConnect = useCallback(() => {
+    console.log("Conectado al lobby", code);
+    fetchMatch();
+  }, [code, fetchMatch]);
+
+  const handleLobbyDisconnect = useCallback(() => {
+    console.log("Desconectado del lobby", code);
+    fetchMatch();
+  }, [code, fetchMatch]);
 
   useLobby(
     code,
     (payload: any) => setMatch(payload as Match),
-    () => console.log("Conectado al lobby", code),
-    () => console.log("Desconectado del lobby", code)
+    handleLobbyConnect,
+    handleLobbyDisconnect
   );
 
   useEffect(() => {

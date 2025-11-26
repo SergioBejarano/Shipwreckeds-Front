@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Avatar, GameState } from './types';
 
 type Params = {
@@ -10,16 +10,24 @@ type Params = {
   canvasHeight: number;
   connected: boolean;
   getDisplayName: (a: Avatar) => string;
-  npcNameMapRef: React.MutableRefObject<Record<number, string>>;
 };
 
-export function useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, canvasWidth, canvasHeight, connected, getDisplayName, npcNameMapRef }: Params) {
+export function useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, canvasWidth, canvasHeight, connected, getDisplayName }: Params) {
+  const timerSnapshotRef = useRef<number | null>(null);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     let rafId = 0;
+    let lastFrameTime = performance.now();
+    if (typeof gameState?.timerSeconds === 'number') {
+      timerSnapshotRef.current = Math.max(0, gameState.timerSeconds);
+    } else {
+      timerSnapshotRef.current = null;
+    }
+    let timerValue = timerSnapshotRef.current;
 
     const canvasEl = canvas as HTMLCanvasElement;
     const ctxEl = ctx as CanvasRenderingContext2D;
@@ -57,6 +65,15 @@ export function useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, ca
     }
 
     function draw() {
+      const now = performance.now();
+      const deltaSeconds = (now - lastFrameTime) / 1000;
+      lastFrameTime = now;
+
+      if (timerValue !== null) {
+        timerValue = Math.max(0, timerValue - deltaSeconds);
+        timerSnapshotRef.current = timerValue;
+      }
+
   ctxEl.clearRect(0, 0, canvasEl.width, canvasEl.height);
 
       // sea
@@ -143,8 +160,12 @@ export function useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, ca
       }
 
       // timer
-      if (typeof gameState.timerSeconds === 'number') {
-        const ts = Math.max(0, Math.floor(gameState.timerSeconds));
+      const timerForDisplay = typeof timerValue === 'number'
+        ? timerValue
+        : (typeof gameState.timerSeconds === 'number' ? gameState.timerSeconds : null);
+
+      if (typeof timerForDisplay === 'number') {
+        const ts = Math.max(0, Math.floor(timerForDisplay));
         const mins = Math.floor(ts / 60).toString().padStart(2, '0');
         const secs = (ts % 60).toString().padStart(2, '0');
         const label = `${mins}:${secs}`;
@@ -180,5 +201,5 @@ export function useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, ca
 
     rafId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafId);
-  }, [canvasRef, barcoImgRef, gameState, currentUser, canvasWidth, canvasHeight, connected, getDisplayName, npcNameMapRef]);
+  }, [canvasRef, barcoImgRef, gameState, currentUser, canvasWidth, canvasHeight, connected, getDisplayName]);
 }

@@ -1,15 +1,13 @@
-import type { Avatar } from '../../utils/GameCanvas/types';
-
-type VoteResultPayload = { counts: Record<number, number>; expelledId?: number | null; expelledType?: string; message?: string; abstentions?: number };
+import type { Avatar, VoteResultPayload } from '../../utils/GameCanvas/types';
 
 interface Props {
   result: VoteResultPayload;
   gameState: { avatars: Avatar[] } | null;
-  npcNameMap: Record<number, string>;
+  getDisplayName: (a: Avatar) => string;
   onClose: () => void;
 }
 
-export default function VoteResultModal({ result, gameState, npcNameMap, onClose }: Props) {
+export default function VoteResultModal({ result, gameState, getDisplayName, onClose }: Props) {
   return (
     <div className="vote-modal">
       <div className="vote-modal-card">
@@ -19,7 +17,7 @@ export default function VoteResultModal({ result, gameState, npcNameMap, onClose
             const id = Number(k);
             const count = result.counts[id];
             const av = gameState?.avatars.find(a => a.id === id);
-            const name = av ? (av.displayName || av.ownerUsername || npcNameMap[id] || `NPC-${id}`) : (npcNameMap[id] || `NPC-${id}`);
+            const name = av ? getDisplayName(av) : `NPC-${id}`;
             return (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: '#f7f9fb', borderRadius: 6, marginBottom: 6 }}>
                 <div>{name}</div>

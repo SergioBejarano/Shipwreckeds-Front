@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Avatar, GameState } from '../../../utils/GameCanvas/types';
 
 type FuelControlsParams = {
@@ -38,6 +38,8 @@ export function useFuelControls({
   getMyAvatar,
 }: FuelControlsParams): FuelControls {
   const [fuelActionPending, setFuelActionPending] = useState(false);
+  const [fuelWindowSecondsRemaining, setFuelWindowSecondsRemaining] = useState(() => gameState?.fuelWindowSecondsRemaining ?? 0);
+  const countdownRef = useRef<number | null>(null);
 
   const fuelPercentage = useMemo(() => clampFuel(gameState?.fuelPercentage), [gameState?.fuelPercentage]);
 
@@ -45,7 +47,9 @@ export function useFuelControls({
   const isGameFinished = status === 'FINISHED';
 
   const fuelWindowOpen = !!gameState?.fuelWindowOpen;
-  const fuelWindowSecondsRemaining = gameState?.fuelWindowSecondsRemaining ?? 0;
+  const serverFuelSeconds = typeof gameState?.fuelWindowSecondsRemaining === 'number'
+    ? Math.max(0, gameState.fuelWindowSecondsRemaining)
+    : null;
   const fuelWindowMessage = fuelWindowOpen ? 'Tanque de gasolina disponible.' : 'Tanque de gasolina bloqueado.';
 
   const myAvatar = getMyAvatar();
@@ -100,6 +104,41 @@ export function useFuelControls({
       setFuelActionPending(false);
     }
   }, [backendBase, currentUser, fuelWindowOpen, gameState, getMyAvatar, isGameFinished, matchCode]);
+
+  useEffect(() => {
+    if (typeof serverFuelSeconds === 'number') {
+      setFuelWindowSecondsRemaining(serverFuelSeconds);
+      countdownRef.current = serverFuelSeconds;
+    } else {
+      setFuelWindowSecondsRemaining(0);
+      countdownRef.current = null;
+    }
+  }, [serverFuelSeconds]);
+
+  useEffect(() => {
+    let rafId: number | null = null;
+    let last = performance.now();
+
+    const tick = () => {
+      const now = performance.now();
+      const delta = (now - last) / 1000;
+      last = now;
+
+      if (countdownRef.current != null) {
+        const next = Math.max(0, countdownRef.current - delta);
+        countdownRef.current = next;
+        setFuelWindowSecondsRemaining((prev) => {
+          const rounded = Math.max(0, Math.floor(next));
+          return prev !== rounded ? rounded : prev;
+        });
+      }
+
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => { if (rafId !== null) cancelAnimationFrame(rafId); };
+  }, []);
 
   return {
     fuelPercentage,

@@ -4,11 +4,10 @@ import { useStompClient } from './GameCanvas/useStompClient';
 import { useBarcoImage } from './GameCanvas/useBarcoImage';
 import { useGameLoop } from '../utils/GameCanvas/useGameLoop';
 import { useMovement } from '../utils/GameCanvas/useMovement';
-import type { Avatar, GameState } from '../utils/GameCanvas/types';
+import type { Avatar, GameState, VoteResultPayload } from '../utils/GameCanvas/types';
 import VoteModal from './GameCanvas/VoteModal';
 import VoteResultModal from './GameCanvas/VoteResultModal';
 import { useInitialMatchBootstrap } from './GameCanvas/hooks/useInitialMatchBootstrap';
-import { useNpcAliasRegistry } from './GameCanvas/hooks/useNpcAliasRegistry';
 import { useInfiltratorTracking } from './GameCanvas/hooks/useInfiltratorTracking';
 import { useCompletionNotifier } from './GameCanvas/hooks/useCompletionNotifier';
 import { useEliminationWatcher } from './GameCanvas/hooks/useEliminationWatcher';
@@ -22,8 +21,6 @@ import { useEliminationInteraction } from './GameCanvas/hooks/useEliminationInte
 import { API_BASE } from '../utils/api';
 
 const BACKEND_BASE = API_BASE;
-
-type VoteResultPayload = { counts: Record<number, number>; expelledId?: number | null; expelledType?: string; message?: string; abstentions?: number };
 
 type Props = {
   matchCode: string;
@@ -47,51 +44,92 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const [hasVoted, setHasVoted] = useState(false);
   const [voteResult, setVoteResult] = useState<VoteResultPayload | null>(null);
   const myAvatarIdRef = useRef<number | null>(null);
-  const npcNameMapRef = useRef<Record<number, string>>({});
-  const npcAliasCounterRef = useRef<number>(100000);
-  useEffect(() => {
-    npcNameMapRef.current = {};
-    npcAliasCounterRef.current = 100000;
-  }, [matchCode]);
   const isInfiltratorRef = useRef<boolean>(false);
   const completionShownRef = useRef<boolean>(false);
   const myAliveRef = useRef<boolean | null>(null);
   const [eliminationMessage, setEliminationMessage] = useState<string | null>(null);
   const eliminationRedirectRef = useRef<number | null>(null);
+  const lastVoteEndRef = useRef<number>(0);
+  const lastVoteResultRef = useRef<number>(0);
+
+  useEffect(() => {
+    lastVoteEndRef.current = 0;
+    lastVoteResultRef.current = 0;
+  }, [matchCode]);
 
   const [resultModalOpen, setResultModalOpen] = useState(false);
 
   useInitialMatchBootstrap(matchCode, currentUser, setGameState, myAvatarIdRef);
-  useNpcAliasRegistry(gameState, npcNameMapRef, npcAliasCounterRef);
   useInfiltratorTracking(gameState, currentUser, myAvatarIdRef, isInfiltratorRef);
   useCompletionNotifier(gameState, completionShownRef);
   useEliminationWatcher(gameState, currentUser, myAvatarIdRef, myAliveRef, setEliminationMessage);
   useEliminationRedirect(eliminationMessage, eliminationRedirectRef, onExitToMenu);
 
-  const handleVoteStart = useCallback((payload: { options?: Avatar[]; durationSeconds?: number } | null) => {
+  const handleVoteStart = useCallback((payload: { options?: Avatar[]; durationSeconds?: number; voteEndsAtEpochMs?: number } | null) => {
     const incomingOptions = payload && Array.isArray(payload.options) ? payload.options : [];
     setVoteOptions(incomingOptions);
     const duration = payload && typeof payload.durationSeconds !== 'undefined'
       ? Number(payload.durationSeconds)
       : NaN;
-    setVoteDuration(Number.isFinite(duration) && duration > 0 ? duration : 20);
+    const effectiveDuration = Number.isFinite(duration) && duration > 0 ? duration : 20;
+    setVoteDuration(effectiveDuration);
     setHasVoted(false);
     setVoteResult(null);
     setVoteModalOpen(true);
+    lastVoteEndRef.current = payload?.voteEndsAtEpochMs ?? (Date.now() + effectiveDuration * 1000);
+    lastVoteResultRef.current = 0;
   }, [setVoteModalOpen, setHasVoted, setVoteOptions, setVoteDuration, setVoteResult]);
 
-  useStompClient(matchCode, clientRef as any, setGameState, setConnected, setVoteOptions, setVoteModalOpen, setVoteResult, handleVoteStart);
+  const handleVoteResultPayload = useCallback((payload: VoteResultPayload | null) => {
+    if (!payload) {
+      setVoteResult(null);
+      return;
+    }
+    lastVoteResultRef.current = Date.now();
+    setVoteResult(payload);
+  }, []);
+
+  useStompClient(matchCode, clientRef as any, setGameState, setConnected, setVoteOptions, setVoteModalOpen, handleVoteResultPayload, handleVoteStart);
 
   useBarcoImage(barcoImgRef);
 
   const getDisplayName = useCallback((a: Avatar) => {
-    if (a.type === 'npc') {
-      return npcNameMapRef.current[a.id] || a.displayName || `NPC-${npcAliasCounterRef.current}`;
+    if (a.displayName) {
+      return a.displayName;
     }
-    if (a.ownerUsername) return a.ownerUsername;
-    if (a.displayName) return a.displayName;
-    return `Jugador-${a.id}`;
+    if (a.ownerUsername) {
+      return a.ownerUsername;
+    }
+    return a.type === 'npc' ? `NPC-${a.id}` : `Jugador-${a.id}`;
   }, []);
+  useEffect(() => {
+    if (!gameState?.votingActive || !gameState.voteOptions || !gameState.voteEndsAtEpochMs) {
+      return;
+    }
+    const alreadyHandled = lastVoteEndRef.current >= gameState.voteEndsAtEpochMs;
+    if (alreadyHandled) {
+      return;
+    }
+    const secondsRemaining = Math.max(0, Math.ceil((gameState.voteEndsAtEpochMs - Date.now()) / 1000));
+    handleVoteStart({
+      options: gameState.voteOptions,
+      durationSeconds: secondsRemaining,
+      voteEndsAtEpochMs: gameState.voteEndsAtEpochMs,
+    });
+  }, [gameState, handleVoteStart]);
+
+  useEffect(() => {
+    if (!gameState?.lastVoteResult || !gameState.lastVoteResultEpochMs) {
+      return;
+    }
+    if (gameState.lastVoteResultEpochMs <= lastVoteResultRef.current) {
+      lastVoteResultRef.current = Math.max(lastVoteResultRef.current, gameState.lastVoteResultEpochMs);
+      return;
+    }
+    setVoteResult(gameState.lastVoteResult);
+    setVoteModalOpen(false);
+    lastVoteResultRef.current = gameState.lastVoteResultEpochMs;
+  }, [gameState, setVoteModalOpen]);
 
   const getMyAvatar = useCallback((): Avatar | undefined => {
     if (!gameState) return undefined;
@@ -105,7 +143,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const { handleCanvasClick, handleMouseMove, cursorRef } = useMovement({ clientRef, matchCode, currentUser, getMyAvatar, gameState });
 
   // canvas drawing loop (hook)
-  useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, canvasWidth, canvasHeight, connected, getDisplayName, npcNameMapRef });
+  useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, canvasWidth, canvasHeight, connected, getDisplayName });
 
   const {
     fuelPercentage,
@@ -257,7 +295,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
         <VoteResultModal
           result={voteResult}
           gameState={gameState}
-          npcNameMap={npcNameMapRef.current}
+          getDisplayName={getDisplayName}
           onClose={handleCloseVoteResult}
         />
       )}
