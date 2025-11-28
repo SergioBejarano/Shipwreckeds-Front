@@ -57,12 +57,17 @@ export function useStompClient(
                   }
                 });
               }
+              const publishedRaw = typeof payload.publishedAtEpochMs === 'number'
+                ? payload.publishedAtEpochMs
+                : Number(payload.publishedAtEpochMs ?? 0);
+              const publishedAtEpochMs = Number.isFinite(publishedRaw) && publishedRaw > 0 ? publishedRaw : Date.now();
               return {
                 counts: normalizedCounts,
                 expelledId: typeof payload.expelledId === 'number' ? payload.expelledId : (payload.expelledId != null ? Number(payload.expelledId) : undefined),
                 expelledType: payload.expelledType ?? payload.expelledtype,
                 message: payload.message,
                 abstentions: typeof payload.abstentions === 'number' ? payload.abstentions : Number(payload.abstentions ?? 0),
+                publishedAtEpochMs,
               };
             };
 

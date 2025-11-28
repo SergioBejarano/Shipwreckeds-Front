@@ -85,7 +85,10 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
       setVoteResult(null);
       return;
     }
-    lastVoteResultRef.current = Date.now();
+    const publishedAt = typeof payload.publishedAtEpochMs === 'number' && payload.publishedAtEpochMs > 0
+      ? payload.publishedAtEpochMs
+      : Date.now();
+    lastVoteResultRef.current = publishedAt;
     setVoteResult(payload);
   }, []);
 
@@ -119,16 +122,19 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   }, [gameState, handleVoteStart]);
 
   useEffect(() => {
-    if (!gameState?.lastVoteResult || !gameState.lastVoteResultEpochMs) {
+    if (!gameState?.lastVoteResult) {
       return;
     }
-    if (gameState.lastVoteResultEpochMs <= lastVoteResultRef.current) {
-      lastVoteResultRef.current = Math.max(lastVoteResultRef.current, gameState.lastVoteResultEpochMs);
+    const publishedAt = gameState.lastVoteResultEpochMs
+      ?? gameState.lastVoteResult.publishedAtEpochMs
+      ?? 0;
+    if (!publishedAt || publishedAt <= lastVoteResultRef.current) {
+      lastVoteResultRef.current = Math.max(lastVoteResultRef.current, publishedAt);
       return;
     }
     setVoteResult(gameState.lastVoteResult);
     setVoteModalOpen(false);
-    lastVoteResultRef.current = gameState.lastVoteResultEpochMs;
+    lastVoteResultRef.current = publishedAt;
   }, [gameState, setVoteModalOpen]);
 
   const getMyAvatar = useCallback((): Avatar | undefined => {

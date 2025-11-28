@@ -16,6 +16,7 @@ export type VoteResultPayload = {
   expelledType?: string;
   message?: string;
   abstentions?: number;
+  publishedAtEpochMs?: number;
 };
 
 export type Island = {
