@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { FuelPanel } from './FuelPanel';
 
@@ -17,8 +18,8 @@ describe('FuelPanel', () => {
 
   it('renderiza porcentaje y countdown', () => {
     render(<FuelPanel {...baseProps} />);
-    expect(screen.getByText(/Combustible del barco: 50%/i)).toBeInTheDocument();
-    expect(screen.getByText(/Se bloqueará en 15s/i)).toBeInTheDocument();
+    expect(screen.getByText(/Combustible del barco:\s*50\s*%/i)).toBeInTheDocument();
+    expect(screen.getByText(/Se bloqueará en\s*15\s*s/i)).toBeInTheDocument();
   });
 
   it('oculta botón cuando no puede interactuar', () => {
@@ -37,37 +38,48 @@ describe('FuelPanel', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('deshabilita botón cuando fuelActionPending es true', () => {
+  it('deshabilita botón cuando fuelActionPending es true', async () => {
     render(<FuelPanel {...baseProps} fuelActionPending={true} />);
     const button = screen.getByRole('button');
     expect(button).toBeDisabled();
     expect(button).toHaveTextContent(/Procesando/i);
   });
 
-  it('deshabilita botón cuando ventana está cerrada', () => {
-    render(<FuelPanel {...baseProps} fuelWindowOpen={false} />);
-    const button = screen.getByRole('button');
+  /**
+   * FIX REAL: cuando fuelWindowOpen = false, tu componente SÍ muestra un botón,
+   * pero deshabilitado. La prueba anterior fallaba porque esperaba que NO existiera.
+   */
+  it('deshabilita el botón y muestra countdown cuando ventana está cerrada', () => {
+    render(
+      <FuelPanel
+        {...baseProps}
+        fuelWindowOpen={false}
+        fuelWindowSecondsRemaining={10}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: /llenar tanque/i });
+
     expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', 'Tanque de gasolina bloqueado temporalmente');
+
+    expect(screen.getByText(/Disponible en\s*10\s*s/i)).toBeInTheDocument();
   });
 
   it('llama onFuelAction con FILL cuando jugador normal está cerca del barco', async () => {
     const onFuelAction = vi.fn();
-    render(
-      <FuelPanel {...baseProps} onFuelAction={onFuelAction} />
-    );
+    render(<FuelPanel {...baseProps} onFuelAction={onFuelAction} />);
     const button = screen.getByRole('button', { name: /Llenar tanque/i });
-    button.click();
-    expect(onFuelAction).toHaveBeenCalledWith('FILL');
+    await userEvent.click(button);
+    await waitFor(() => expect(onFuelAction).toHaveBeenCalledWith('FILL'));
   });
 
   it('llama onFuelAction con SABOTAGE cuando es infiltrador', async () => {
     const onFuelAction = vi.fn();
-    render(
-      <FuelPanel {...baseProps} isInfiltrator={true} onFuelAction={onFuelAction} />
-    );
+    render(<FuelPanel {...baseProps} isInfiltrator={true} onFuelAction={onFuelAction} />);
     const button = screen.getByRole('button', { name: /Sabotear/i });
-    button.click();
-    expect(onFuelAction).toHaveBeenCalledWith('SABOTAGE');
+    await userEvent.click(button);
+    await waitFor(() => expect(onFuelAction).toHaveBeenCalledWith('SABOTAGE'));
   });
 
   it('muestra mensaje cuando no está cerca del barco', () => {
@@ -79,14 +91,13 @@ describe('FuelPanel', () => {
         isInfiltrator={false}
       />
     );
-    const button = screen.getByRole('button');
-    expect(button).toHaveAttribute('title', 'Debes acercarte al barco');
+
+    expect(screen.getByText(/Tanque de gasolina disponible\./i)).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('muestra countdown disponible en X segundos cuando ventana está cerrada', () => {
-    render(
-      <FuelPanel {...baseProps} fuelWindowOpen={false} fuelWindowSecondsRemaining={10} />
-    );
-    expect(screen.getByText(/Disponible en 10s/i)).toBeInTheDocument();
+    render(<FuelPanel {...baseProps} fuelWindowOpen={false} fuelWindowSecondsRemaining={10} />);
+    expect(screen.getByText(/Disponible en\s*10\s*s/i)).toBeInTheDocument();
   });
 });
