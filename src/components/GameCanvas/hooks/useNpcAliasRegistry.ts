@@ -17,6 +17,7 @@ export function useNpcAliasRegistry(
     const aliasOwners = new Map<string, number>();
     const used = new Set<string>();
     const nextAliases: Record<number, string> = {};
+    const activeNpcIds = new Set<number>();
 
     for (const [idStr, alias] of Object.entries(map)) {
       if (typeof alias === 'string' && NPC_ALIAS_REGEX.test(alias)) {
@@ -55,6 +56,7 @@ export function useNpcAliasRegistry(
       if (avatar.type !== 'npc') {
         continue;
       }
+      activeNpcIds.add(avatar.id);
 
       const serverAlias = typeof avatar.displayName === 'string' ? avatar.displayName : null;
       const currentAlias = typeof map[avatar.id] === 'string' ? map[avatar.id] : null;
@@ -71,6 +73,13 @@ export function useNpcAliasRegistry(
 
     for (const [idStr, alias] of Object.entries(nextAliases)) {
       map[Number(idStr)] = alias;
+    }
+
+    for (const idStr of Object.keys(map)) {
+      const idNum = Number(idStr);
+      if (!activeNpcIds.has(idNum)) {
+        delete map[idNum];
+      }
     }
   }, [gameState, npcNameMapRef, npcAliasCounterRef]);
 }

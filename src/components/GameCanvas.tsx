@@ -18,6 +18,7 @@ import { ResultOverlay } from './GameCanvas/ResultOverlay';
 import { EliminationOverlay } from './GameCanvas/EliminationOverlay';
 import { useFuelControls } from './GameCanvas/hooks/useFuelControls';
 import { useEliminationInteraction } from './GameCanvas/hooks/useEliminationInteraction';
+import { useNpcAliasRegistry } from './GameCanvas/hooks/useNpcAliasRegistry';
 import { API_BASE } from '../utils/api';
 
 const BACKEND_BASE = API_BASE;
@@ -36,6 +37,8 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const clientRef = useRef<any | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [connected, setConnected] = useState(false);
+  const npcNameMapRef = useRef<Record<number, string>>({});
+  const npcAliasCounterRef = useRef<number>(100000);
 
   // voting UI state
   const [voteModalOpen, setVoteModalOpen] = useState(false);
@@ -55,6 +58,8 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   useEffect(() => {
     lastVoteEndRef.current = 0;
     lastVoteResultRef.current = 0;
+    npcNameMapRef.current = {};
+    npcAliasCounterRef.current = 100000;
   }, [matchCode]);
 
   const [resultModalOpen, setResultModalOpen] = useState(false);
@@ -64,6 +69,7 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   useCompletionNotifier(gameState, completionShownRef);
   useEliminationWatcher(gameState, currentUser, myAvatarIdRef, myAliveRef, setEliminationMessage);
   useEliminationRedirect(eliminationMessage, eliminationRedirectRef, onExitToMenu);
+  useNpcAliasRegistry(gameState, npcNameMapRef, npcAliasCounterRef);
 
   const handleVoteStart = useCallback((payload: { options?: Avatar[]; durationSeconds?: number; voteEndsAtEpochMs?: number } | null) => {
     const incomingOptions = payload && Array.isArray(payload.options) ? payload.options : [];
@@ -99,6 +105,12 @@ export default function GameCanvas({ matchCode, currentUser, canvasWidth = 900, 
   const getDisplayName = useCallback((a: Avatar) => {
     if (a.displayName) {
       return a.displayName;
+    }
+    if (a.type === 'npc') {
+      const alias = npcNameMapRef.current[a.id];
+      if (alias) {
+        return alias;
+      }
     }
     if (a.ownerUsername) {
       return a.ownerUsername;
