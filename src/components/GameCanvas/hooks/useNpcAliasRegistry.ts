@@ -1,12 +1,42 @@
-import { useEffect, type MutableRefObject } from 'react';
-import type { GameState } from '../../../utils/GameCanvas/types';
+import { useEffect, type RefObject } from 'react';
+import type { Avatar, GameState } from '../../../utils/GameCanvas/types';
 
 const NPC_ALIAS_REGEX = /^NPC-\d+$/i;
 
+type AliasContext = {
+  aliasOwners: Map<string, number>;
+  used: Set<string>;
+};
+
+function seedAliasContext(map: Record<number, string>): AliasContext {
+  const aliasOwners = new Map<string, number>();
+  const used = new Set<string>();
+  for (const [idStr, alias] of Object.entries(map)) {
+    if (typeof alias === 'string' && NPC_ALIAS_REGEX.test(alias)) {
+      const idNum = Number(idStr);
+      aliasOwners.set(alias, idNum);
+      used.add(alias);
+    }
+  }
+  return { aliasOwners, used };
+}
+
+function persistAliases(target: Record<number, string>, nextAliases: Record<number, string>, activeNpcIds: Set<number>) {
+  for (const [idStr, alias] of Object.entries(nextAliases)) {
+    target[Number(idStr)] = alias;
+  }
+  for (const idStr of Object.keys(target)) {
+    const idNum = Number(idStr);
+    if (!activeNpcIds.has(idNum)) {
+      delete target[idNum];
+    }
+  }
+}
+
 export function useNpcAliasRegistry(
   gameState: GameState | null,
-  npcNameMapRef: MutableRefObject<Record<number, string>>,
-  npcAliasCounterRef: MutableRefObject<number>
+  npcNameMapRef: RefObject<Record<number, string>>,
+  npcAliasCounterRef: RefObject<number>
 ) {
   useEffect(() => {
     if (!gameState) {
@@ -14,18 +44,9 @@ export function useNpcAliasRegistry(
     }
 
     const map = npcNameMapRef.current;
-    const aliasOwners = new Map<string, number>();
-    const used = new Set<string>();
+    const { aliasOwners, used } = seedAliasContext(map);
     const nextAliases: Record<number, string> = {};
     const activeNpcIds = new Set<number>();
-
-    for (const [idStr, alias] of Object.entries(map)) {
-      if (typeof alias === 'string' && NPC_ALIAS_REGEX.test(alias)) {
-        const idNum = Number(idStr);
-        aliasOwners.set(alias, idNum);
-        used.add(alias);
-      }
-    }
 
     const tryUseAlias = (candidate: string | null | undefined, id: number) => {
       if (!candidate || !NPC_ALIAS_REGEX.test(candidate) || used.has(candidate)) {
@@ -52,9 +73,9 @@ export function useNpcAliasRegistry(
       }
     };
 
-    for (const avatar of gameState.avatars) {
+    const assignAlias = (avatar: Avatar) => {
       if (avatar.type !== 'npc') {
-        continue;
+        return;
       }
       activeNpcIds.add(avatar.id);
 
@@ -69,17 +90,9 @@ export function useNpcAliasRegistry(
       nextAliases[avatar.id] = alias;
       used.add(alias);
       aliasOwners.set(alias, avatar.id);
-    }
+    };
 
-    for (const [idStr, alias] of Object.entries(nextAliases)) {
-      map[Number(idStr)] = alias;
-    }
-
-    for (const idStr of Object.keys(map)) {
-      const idNum = Number(idStr);
-      if (!activeNpcIds.has(idNum)) {
-        delete map[idNum];
-      }
-    }
+    gameState.avatars.forEach(assignAlias);
+    persistAliases(map, nextAliases, activeNpcIds);
   }, [gameState, npcNameMapRef, npcAliasCounterRef]);
 }

@@ -1,10 +1,10 @@
-import { useEffect, type MutableRefObject, type RefObject } from 'react';
+import { useEffect, type RefObject } from 'react';
 
 export function useCanvasEvents(
   canvasRef: RefObject<HTMLCanvasElement | null>,
   handleEliminationClick: (event: MouseEvent) => void,
   handleMouseMove: (event: MouseEvent) => void,
-  cursorRef: MutableRefObject<{ x: number; y: number } | null> | null
+  cursorRef: RefObject<{ x: number; y: number } | null> | null
 ) {
   useEffect(() => {
     const canvas = canvasRef.current;

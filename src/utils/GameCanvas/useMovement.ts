@@ -3,7 +3,7 @@ import type { Client } from '@stomp/stompjs';
 import type { GameState, Avatar } from './types';
 
 type Params = {
-  clientRef: React.MutableRefObject<Client | null>;
+  clientRef: React.RefObject<Client | null>;
   matchCode: string;
   currentUser: string;
   getMyAvatar: () => Avatar | undefined;

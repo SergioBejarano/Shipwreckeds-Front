@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { MutableRefObject, RefObject } from 'react';
+import type { RefObject } from 'react';
 import type { Avatar, GameState } from '../../../utils/GameCanvas/types';
 
 const TARGET_PIXEL_RADIUS = 32;
@@ -10,7 +10,7 @@ export type EliminationInteractionParams = {
   backendBase: string;
   matchCode: string;
   currentUser: string;
-  isInfiltratorRef: MutableRefObject<boolean>;
+  isInfiltratorRef: RefObject<boolean>;
   getMyAvatar: () => Avatar | undefined;
   handleCanvasClick: (event: MouseEvent) => void;
 };

@@ -1,4 +1,4 @@
-import { useEffect, type MutableRefObject } from 'react';
+import { useEffect, type RefObject } from 'react';
 import { getMatch } from '../../../utils/api';
 import type { Avatar, GameState } from '../../../utils/GameCanvas/types';
 
@@ -6,7 +6,7 @@ export function useInitialMatchBootstrap(
   matchCode: string,
   currentUser: string,
   setGameState: (state: GameState | null) => void,
-  myAvatarIdRef: MutableRefObject<number | null>
+  myAvatarIdRef: RefObject<number | null>
 ) {
   useEffect(() => {
     let mounted = true;

@@ -1,11 +1,11 @@
-import { useEffect, type MutableRefObject } from 'react';
+import { useEffect, type RefObject } from 'react';
 import type { GameState } from '../../../utils/GameCanvas/types';
 
 export function useInfiltratorTracking(
   gameState: GameState | null,
   currentUser: string,
-  myAvatarIdRef: MutableRefObject<number | null>,
-  isInfiltratorRef: MutableRefObject<boolean>
+  myAvatarIdRef: RefObject<number | null>,
+  isInfiltratorRef: RefObject<boolean>
 ) {
   useEffect(() => {
     if (!gameState) {

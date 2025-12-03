@@ -29,8 +29,8 @@ export function useGameLoop({ canvasRef, barcoImgRef, gameState, currentUser, ca
     }
     let timerValue = timerSnapshotRef.current;
 
-    const canvasEl = canvas as HTMLCanvasElement;
-    const ctxEl = ctx as CanvasRenderingContext2D;
+    const canvasEl = canvas;
+    const ctxEl = ctx;
 
     function worldToPixel(x: number, y: number) {
       const w = canvasEl.width / (window.devicePixelRatio || 1);

@@ -1,10 +1,10 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import type { MutableRefObject } from 'react';
+import type { RefObject } from 'react';
 import { useNpcAliasRegistry } from './useNpcAliasRegistry';
 import type { Avatar, GameState } from '../../../utils/GameCanvas/types';
 
-const createRef = <T,>(value: T): MutableRefObject<T> => ({ current: value } as MutableRefObject<T>);
+const createRef = <T,>(value: T): RefObject<T> => ({ current: value } as RefObject<T>);
 
 const buildNpc = (id: number, partial: Partial<Avatar> = {}): Avatar => ({
   id,

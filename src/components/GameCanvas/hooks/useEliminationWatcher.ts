@@ -1,11 +1,11 @@
-import { useEffect, type MutableRefObject } from 'react';
+import { useEffect, type RefObject } from 'react';
 import type { GameState } from '../../../utils/GameCanvas/types';
 
 export function useEliminationWatcher(
   gameState: GameState | null,
   currentUser: string,
-  myAvatarIdRef: MutableRefObject<number | null>,
-  myAliveRef: MutableRefObject<boolean | null>,
+  myAvatarIdRef: RefObject<number | null>,
+  myAliveRef: RefObject<boolean | null>,
   setEliminationMessage: (value: string | null) => void
 ) {
   useEffect(() => {

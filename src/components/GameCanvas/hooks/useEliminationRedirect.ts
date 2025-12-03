@@ -1,8 +1,8 @@
-import { useEffect, type MutableRefObject } from 'react';
+import { useEffect, type RefObject } from 'react';
 
 export function useEliminationRedirect(
   eliminationMessage: string | null,
-  eliminationRedirectRef: MutableRefObject<number | null>,
+  eliminationRedirectRef: RefObject<number | null>,
   onRedirect: () => void
 ) {
   useEffect(() => {

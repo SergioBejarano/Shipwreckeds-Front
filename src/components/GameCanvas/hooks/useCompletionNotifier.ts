@@ -1,9 +1,9 @@
-import { useEffect, type MutableRefObject } from 'react';
+import { useEffect, type RefObject } from 'react';
 import type { GameState } from '../../../utils/GameCanvas/types';
 
 export function useCompletionNotifier(
   gameState: GameState | null,
-  completionShownRef: MutableRefObject<boolean>
+  completionShownRef: RefObject<boolean>
 ) {
   useEffect(() => {
     if (!gameState) {
